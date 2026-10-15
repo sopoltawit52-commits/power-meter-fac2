@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>Power Meter Fac.2</title>
   <meta name="theme-color" content="#0f172a">
   <link rel="manifest" href="manifest.webmanifest">
@@ -68,6 +68,8 @@
       call('getFloorPlan', []).then(src => { const im = document.getElementById('floorPlanImg'); if (im && src) im.src = src; }).catch(() => {});
       call('getTodayPhotos', []).then(m => { window.pmTodayPhotos = Object.assign(window.pmTodayPhotos || {}, m || {}); }).catch(() => {});
     });
+    const setHdr = () => { const h = document.getElementById('appHeader'); if (h) document.documentElement.style.setProperty('--hdrH', h.offsetHeight + 'px'); };
+    window.addEventListener('DOMContentLoaded', setHdr); window.addEventListener('resize', setHdr); window.addEventListener('load', setHdr);
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   })();
   </script>
@@ -102,23 +104,45 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    /* ===== มือถือ: หน้าตาแบบแอป (จอกว้างไม่เกิน 639px) ===== */
+    html, body { overflow-x: hidden; }
+    #appHeader { padding-top: env(safe-area-inset-top); }
+    #mobileNav { padding-bottom: env(safe-area-inset-bottom); }
+    @media (max-width: 639px) {
+      body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+      #viewMap { flex: none; height: calc(100dvh - var(--hdrH, 76px) - 80px - env(safe-area-inset-bottom)); min-height: 360px; border-radius: 16px; }
+      #mapViewport { min-height: 0 !important; }
+      #viewDashboard { padding-bottom: 8px; }
+      .kpi-head { flex-wrap: wrap; gap: 4px; }
+      input, select, textarea { font-size: 16px !important; } /* กัน iPhone ซูมเองตอนแตะช่องกรอก */
+      #fltAll, #fltPending, #fltDone, #btnLayoutEdit, #btnRoute { padding: 5px 10px; font-size: 12px; flex-shrink: 0; border-radius: 9999px; }
+    }
+    .mnav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 7px 0 6px; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
+    .mnav-btn .ico { font-size: 20px; line-height: 1; filter: grayscale(1); opacity: .75; transition: transform .15s; }
+    .mnav-btn.active { color: #fbbf24; }
+    .mnav-btn.active .ico { filter: none; opacity: 1; transform: translateY(-1px) scale(1.08); }
+    .mnav-btn.active::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 4px 4px; background: #f59e0b; }
+    .mchip { flex-shrink: 0; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #475569; }
+    .mchip.on-all { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .mchip.on-pending { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
+    .mchip.on-done { background: #059669; color: #fff; border-color: #059669; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased select-none">
 
   <!-- TOP APP BAR -->
-  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+  <header id="appHeader" class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
       
       <!-- Brand & Date -->
       <div class="flex items-center space-x-2.5 min-w-0">
-        <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-lg text-slate-950 shadow-md shrink-0">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-base sm:text-lg text-slate-950 shadow-md shrink-0">
           ⚡
         </div>
         <div class="min-w-0">
           <h1 class="text-sm sm:text-base font-bold text-white truncate flex items-center gap-1.5">
             <span>Power Meter Fac.2</span>
-            <span class="text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
+            <span class="hidden sm:inline text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
           </h1>
           <p class="text-[11px] text-slate-400 truncate" id="currentDateDisplay">กำลังโหลดวันที่...</p>
         </div>
@@ -147,8 +171,8 @@
           <span id="percentText" class="text-[11px] font-semibold text-emerald-400">0%</span>
         </div>
 
-        <!-- View Switcher -->
-        <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
+        <!-- View Switcher (มือถือใช้แถบเมนูด้านล่างแทน) -->
+        <div class="hidden sm:inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
           <button id="btnMapView" onclick="switchView('map')" class="px-2.5 py-1 rounded-md font-medium bg-amber-500 text-slate-950 shadow transition-all">
             🗺️ ผัง
           </button>
@@ -161,12 +185,18 @@
         </div>
 
         <!-- Sheet Log Button -->
-        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1 shadow transition">
+        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="hidden sm:flex p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium items-center gap-1 shadow transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           <span class="hidden md:inline">ตารางชีท</span>
         </button>
       </div>
 
+    </div>
+    <!-- มือถือ: แถบความคืบหน้าวันนี้ -->
+    <div class="sm:hidden px-3 pb-2 -mt-0.5 flex items-center gap-2 text-[11px]">
+      <span class="text-slate-300 shrink-0">จดแล้ว <b id="mRecorded" class="text-amber-400">0</b>/<b id="mTotal">15</b> ตู้</span>
+      <div class="flex-1 bg-slate-700 rounded-full h-1.5 overflow-hidden"><div id="mProgressBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div></div>
+      <span id="mPercent" class="font-semibold text-emerald-400 shrink-0">0%</span>
     </div>
   </header>
 
@@ -177,20 +207,21 @@
     <div id="viewMap" class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
 
       <!-- TOOLBAR: Quick Filter & Guide Hint -->
-      <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-1.5 text-slate-600">
+      <div class="px-2 sm:px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="hidden sm:flex items-center gap-1.5 text-slate-600">
           <span class="font-bold text-slate-900">แผนผังโรงงาน:</span>
           <span class="text-slate-500 hidden sm:inline">ใช้นิ้วเลื่อน / จีบนิ้วเพื่อย่อ-ขยาย</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-semibold">⚠️ รอจด</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-900 font-semibold">✓ จดแล้ว</span>
         </div>
 
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1.5 sm:gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
           <button onclick="filterStatus('all')" id="fltAll" class="px-2 py-0.5 text-[11px] rounded font-semibold bg-slate-900 text-white">ทั้งหมด (15)</button>
           <button onclick="filterStatus('pending')" id="fltPending" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">รอจด (<span id="pendingBadgeCount">15</span>)</button>
           <button onclick="filterStatus('done')" id="fltDone" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">จดแล้ว (<span id="doneBadgeCount">0</span>)</button>
+          <button onclick="toggleRoute()" id="btnRoute" title="แนะนำลำดับการเดินจด" class="shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border border-indigo-300 text-indigo-700 bg-white">🧭 นำทาง</button>
           <button onclick="toggleLayoutEdit()" id="btnLayoutEdit" title="ลากจุดและกล่องชื่อบนแผนผัง" class="px-2 py-0.5 text-[11px] rounded font-medium border border-sky-300 text-sky-700">✏️ จัดตำแหน่ง</button>
-          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
+          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="hidden sm:inline-block text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
         </div>
       </div>
 
@@ -204,6 +235,7 @@
 
           <!-- Leader lines (drawn by JS) -->
           <svg id="leaderLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807"></svg>
+          <svg id="routeLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807" style="z-index:5"></svg>
 
           <!-- Hotspots Layer -->
           <div id="hotspotLayer" class="absolute inset-0 pointer-events-auto"></div>
@@ -238,6 +270,9 @@
           <div id="layoutEditMsg" class="text-[11px] text-rose-600 font-semibold"></div>
         </div>
 
+        <!-- ROUTE PANEL (แนะนำเส้นทางเดินจด) -->
+        <div id="routePanel" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onwheel="event.stopPropagation()" class="hidden absolute bottom-3 left-2 right-2 sm:left-3 sm:right-auto sm:w-80 z-30 bg-white/95 backdrop-blur border-2 border-indigo-500 rounded-2xl shadow-2xl p-2.5 text-xs space-y-2"></div>
+
         <!-- Touch / Pinch Helper Badge for Mobile -->
         <div id="touchHelpHint" class="absolute bottom-3 left-3 z-20 pointer-events-none bg-slate-900/80 backdrop-blur-sm text-slate-300 text-[11px] px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg opacity-90 transition-opacity duration-500">
           <span>👆 ลากเพื่อเลื่อน / 🤏 จีบนิ้วย่อ-ขยาย</span>
@@ -247,7 +282,7 @@
 
       <!-- QUICK SELECTOR RIBBON (Swipable carousel at bottom of map for fast mobile selection) -->
       <div class="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1">
-        <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+        <div class="hidden sm:flex items-center justify-between text-[11px] text-slate-400 px-1">
           <span class="font-semibold text-slate-300">⚡ เลือกจุดตรวจด่วน (แตะเพื่อโฟกัส):</span>
           <span class="text-[10px] text-slate-500">เลื่อนซ้าย-ขวาได้</span>
         </div>
@@ -260,7 +295,8 @@
 
     <!-- VIEW 2: LIST VIEW -->
     <div id="viewList" class="hidden space-y-3">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="cardsContainer">
+      <div id="listChips" class="sm:hidden flex gap-1.5 overflow-x-auto no-scrollbar -mx-0.5 px-0.5"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="cardsContainer">
         <!-- Rendered by JS -->
       </div>
     </div>
@@ -347,7 +383,7 @@
         
         <!-- CARD 1: Unified Factory Total (รวมทุกหน่วยเป็นก้อนเดียวในองค์รวม) -->
         <div class="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-blue-500/40 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard1Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
               <span>⚡</span> รวมไฟทั้งโรงงาน
             </span>
@@ -367,7 +403,7 @@
 
         <!-- CARD 2: Top Peak Consumer (จุดที่ใช้อัตราไฟสูงสุด) -->
         <div class="bg-gradient-to-br from-purple-950/90 to-slate-900 border border-purple-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard2Title" class="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1">
               <span>🔥</span> จุดใช้ไฟสูงสุด
             </span>
@@ -387,7 +423,7 @@
 
         <!-- CARD 3: Progress & Completion -->
         <div class="bg-gradient-to-br from-emerald-950/90 to-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard3Title" class="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1">
               <span>✓</span> จดแล้ว
             </span>
@@ -408,7 +444,7 @@
 
         <!-- CARD 4: Pending & Inspector -->
         <div class="bg-gradient-to-br from-amber-950/90 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard4Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
               <span>⚠️</span> รอจด
             </span>
@@ -605,10 +641,21 @@
 
   </main>
 
+  <!-- การ์ด "ตู้ถัดไป" หลังบันทึก -->
+  <div id="nextCard" class="hidden fixed left-2 right-2 sm:left-auto sm:right-4 sm:w-80 z-[45] top-[calc(var(--hdrH,76px)+8px)] sm:top-auto sm:bottom-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-indigo-400 p-3 text-xs"></div>
+
+  <!-- มือถือ: เมนูด้านล่างแบบแอป -->
+  <nav id="mobileNav" class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex">
+    <button type="button" data-v="map" onclick="switchView('map')" class="mnav-btn active"><span class="ico">🗺️</span>ผัง</button>
+    <button type="button" data-v="list" onclick="switchView('list')" class="mnav-btn"><span class="ico">📋</span>รายการจด</button>
+    <button type="button" data-v="dashboard" onclick="switchView('dashboard')" class="mnav-btn"><span class="ico">📊</span>สรุป</button>
+    <button type="button" onclick="openTableModal()" class="mnav-btn"><span class="ico">📄</span>ตาราง</button>
+  </nav>
+
   <!-- MODAL / BOTTOM SHEET: DATA RECORDING FORM -->
     <!-- EDIT METER INFO MODAL -->
   <div id="meterInfoModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 bg-slate-950/70 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="font-bold text-slate-900 text-sm">✏️ แก้ไขข้อมูลตู้ <span id="miId" class="font-mono text-slate-500"></span></div>
         <button type="button" onclick="closeMeterInfoEditor()" class="text-slate-400 hover:text-slate-700 text-lg px-2">✕</button>
@@ -617,7 +664,14 @@
       <label class="block">ชื่อตู้ <input id="miName" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ป้ายสั้น (บนหมุด/ปุ่มลัด) <input id="miLabel" maxlength="12" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ประเภทตู้ <input id="miType" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
-      <label class="block">อุปกรณ์ควบคุม <textarea id="miLoads" rows="2" maxlength="200" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></textarea></label>
+      <div id="miMachinesBox" class="rounded-xl border border-sky-200 bg-sky-50/50 p-2 space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-800">🏭 เครื่องจักรที่ใช้ตู้นี้ <span id="miMachineCount" class="text-slate-400 font-normal"></span></span>
+          <button type="button" onclick="addMachineRow('')" class="px-2 py-1 rounded-lg bg-sky-600 text-white font-bold">+ เพิ่ม</button>
+        </div>
+        <div id="miMachines" class="space-y-1.5"></div>
+        <div class="text-[10px] text-slate-500">พิมพ์ชื่อเครื่องจักร 1 ช่องต่อ 1 เครื่อง • กด 🗑 เพื่อลบ • ช่องที่เว้นว่างจะไม่ถูกบันทึก</div>
+      </div>
       <label class="block">รหัสผ่านผู้ดูแล <input id="miPin" type="password" inputmode="numeric" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <div class="flex gap-2 pt-1">
         <button type="button" onclick="submitMeterInfo()" class="flex-1 px-3 py-2 rounded-lg bg-sky-600 text-white font-bold">💾 บันทึก</button>
@@ -693,9 +747,12 @@
             <span class="text-slate-500 font-medium">ประเภทตู้:</span>
             <span id="modalCabinetType" class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">Power Panel</span>
           </div>
-          <div class="flex justify-between items-start gap-2">
-            <span class="text-slate-500 font-medium shrink-0">อุปกรณ์ควบคุม:</span>
-            <span id="modalLoads" class="font-semibold text-slate-800 text-right">Plotter RB, Shuttering RB</span>
+          <div class="pt-1.5 border-t border-slate-200">
+            <div class="flex justify-between items-center gap-2 mb-1">
+              <span class="text-slate-500 font-medium">🏭 ตู้นี้จ่ายไฟให้เครื่องจักร:</span>
+              <button type="button" onclick="openMeterInfoEditor(true)" class="text-sky-700 font-bold underline underline-offset-2 shrink-0">✏️ แก้ไข/เพิ่ม/ลบ</button>
+            </div>
+            <div id="modalLoads" class="flex flex-wrap gap-1"></div>
           </div>
         </div>
 
@@ -1399,9 +1456,131 @@
 
       if (layoutEditMode) attachLayoutDrag();
       drawLeaderLines();
+      try { drawRoute(); } catch (e) { console.warn(e); }
       renderQuickSelector();
       updateStats();
     }
+
+    // ----------------------------------------------------
+    // ROUTE GUIDE: แนะนำลำดับเดินจด (ตามระยะบนแผนผัง — เส้นตรง ไม่ได้คิดกำแพง/ทางเดิน)
+    // ----------------------------------------------------
+    let routeOn = false, routeStartId = '';
+    try { routeOn = localStorage.getItem('pm_route_on') === '1'; routeStartId = localStorage.getItem('pm_route_start') || ''; } catch (e) {}
+    const ptOf = m => ({ x: m.planX / 100 * BASE_WIDTH, y: m.planY / 100 * BASE_HEIGHT });
+    const distM = (a, b) => { const p = ptOf(a), q = ptOf(b); return Math.hypot(p.x - q.x, p.y - q.y); };
+    const tagOf = m => (m.label ? m.label + ' ' : '') + m.name;
+    // ตู้ที่ยังไม่จด เรียงตามระยะเดินสั้นที่สุด (ใกล้สุดก่อน + ปรับสลับลำดับ 2-opt) เริ่มจาก startId
+    function planRoute(startId) {
+      const pending = METERS.filter(m => !recordsData[m.id]);
+      const start = METERS.find(m => m.id === startId);
+      if (!pending.length) return { start, order: [] };
+      const pool = pending.filter(m => !start || m.id !== start.id);
+      const path = start ? [start] : [pool.shift()];
+      while (pool.length) {
+        const cur = path[path.length - 1];
+        let bi = 0, bd = Infinity;
+        pool.forEach((m, i) => { const d = distM(cur, m); if (d < bd) { bd = d; bi = i; } });
+        path.push(pool.splice(bi, 1)[0]);
+      }
+      // 2-opt: สลับช่วงลำดับถ้าทำให้ระยะรวมสั้นลง (จุดเริ่มคงที่ เส้นทางไม่ต้องวนกลับ)
+      let improved = true, guard = 0;
+      while (improved && guard++ < 60) {
+        improved = false;
+        for (let i = 1; i < path.length - 1; i++) for (let k = i + 1; k < path.length; k++) {
+          const a = path[i - 1], b = path[i], c = path[k], d = path[k + 1];
+          const before = distM(a, b) + (d ? distM(c, d) : 0), after = distM(a, c) + (d ? distM(b, d) : 0);
+          if (after + 0.01 < before) { path.splice(i, k - i + 1, ...path.slice(i, k + 1).reverse()); improved = true; }
+        }
+      }
+      return { start, order: path.filter(m => !recordsData[m.id]) };
+    }
+    function defaultRouteStart() {
+      if (routeStartId && METERS.some(m => m.id === routeStartId)) return routeStartId;
+      const done = Object.values(recordsData).filter(r => r && r.timestamp).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+      if (done.length && METERS.some(m => m.id === done[0].meterId)) return done[0].meterId;
+      const p = METERS.filter(m => !recordsData[m.id]);
+      return (p[0] || METERS[0] || {}).id || '';
+    }
+    function toggleRoute(force) {
+      routeOn = typeof force === 'boolean' ? force : !routeOn;
+      try { localStorage.setItem('pm_route_on', routeOn ? '1' : '0'); } catch (e) {}
+      if (routeOn && typeof switchView === 'function' && document.getElementById('viewMap').classList.contains('hidden')) switchView('map');
+      drawRoute(); renderCards();
+    }
+    function setRouteStart(id) {
+      routeStartId = id; try { localStorage.setItem('pm_route_start', id); } catch (e) {}
+      drawRoute(); renderCards();
+    }
+    function drawRoute() {
+      const svg = document.getElementById('routeLayer'), panel = document.getElementById('routePanel'), btn = document.getElementById('btnRoute');
+      if (!svg || !panel) return;
+      if (btn) btn.className = 'shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border ' + (routeOn ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-300 text-indigo-700 bg-white');
+      if (!routeOn) { svg.innerHTML = ''; panel.classList.add('hidden'); const h = document.getElementById('touchHelpHint'); if (h) h.classList.remove('hidden'); return; }
+      const h = document.getElementById('touchHelpHint'); if (h) h.classList.add('hidden');
+      const sid = defaultRouteStart();
+      const { start, order } = planRoute(sid);
+      const pts = (start && recordsData[start.id] ? [start] : []).concat(order).map(ptOf);
+      let out = '';
+      if (pts.length > 1) {
+        out += `<polyline points="${pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}" fill="none" stroke="#4f46e5" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`;
+        for (let i = 1; i < pts.length; i++) { // ลูกศรกลางเส้น
+          const a = pts[i - 1], b = pts[i], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+          out += `<path d="M-6,-5 L6,0 L-6,5 Z" fill="#4f46e5" transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`;
+        }
+      }
+      order.forEach((m, i) => { const p = ptOf(m);
+        out += `<g transform="translate(${(p.x + 13).toFixed(1)},${(p.y - 13).toFixed(1)})"><circle r="9" fill="${i === 0 ? '#4f46e5' : '#ffffff'}" stroke="#4f46e5" stroke-width="2"/><text text-anchor="middle" dy="3.5" font-size="10" font-weight="800" fill="${i === 0 ? '#fff' : '#4f46e5'}">${i + 1}</text></g>`;
+        if (i === 0) out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="20" fill="none" stroke="#4f46e5" stroke-width="3"><animate attributeName="r" values="14;26;14" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>`;
+      });
+      svg.innerHTML = out;
+      const opts = METERS.slice().sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true }))
+        .map(m => `<option value="${m.id}" ${m.id === sid ? 'selected' : ''}>${escHtml(tagOf(m))}${recordsData[m.id] ? ' ✓' : ''}</option>`).join('');
+      const next = order[0];
+      panel.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-indigo-800">🧭 แนะนำเส้นทางเดินจด</span>
+          <button type="button" onclick="toggleRoute(false)" class="text-slate-400 hover:text-slate-700 px-1 text-base leading-none">✕</button>
+        </div>
+        <label class="flex items-center gap-1.5"><span class="text-slate-500 shrink-0">เริ่มจาก</span>
+          <select onchange="setRouteStart(this.value)" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-1.5 py-1 bg-white text-xs">${opts}</select></label>
+        ${next ? `
+        <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-2 py-1.5">
+          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0">1</span>
+          <div class="min-w-0 flex-1"><div class="text-[10px] text-indigo-600 font-semibold">ไปจดตู้นี้ก่อน</div><div class="font-bold text-slate-900 truncate">${escHtml(tagOf(next))}</div></div>
+          <button type="button" onclick="focusMeter('${next.id}')" class="px-2 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-700 font-bold shrink-0">📍</button>
+          <button type="button" onclick="openRecordModal('${next.id}')" class="px-2 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold shrink-0">📝 จด</button>
+        </div>
+        <div class="text-[11px] text-slate-600 leading-snug">ลำดับต่อไป: ${order.slice(1, 6).map((m, i) => `<b>${i + 2}.</b> ${escHtml(m.label || m.name)}`).join(' → ') || '-'}${order.length > 6 ? ' → …' : ''}</div>
+        <div class="text-[10px] text-slate-400">เหลือ ${order.length} ตู้ • คิดจากระยะเส้นตรงบนแผนผัง (ไม่ได้คิดกำแพง/ทางเดิน)</div>`
+        : '<div class="text-emerald-700 font-bold py-1">✓ จดครบทุกตู้แล้ววันนี้</div>'}`;
+      panel.classList.remove('hidden');
+    }
+    // หลังบันทึก: แนะนำตู้ถัดไปที่ใกล้ที่สุด
+    function showNextSuggestion(fromId) {
+      const card = document.getElementById('nextCard'); if (!card) return;
+      if (routeOn) { routeStartId = fromId; try { localStorage.setItem('pm_route_start', fromId); } catch (e) {} drawRoute(); }
+      const { order } = planRoute(fromId);
+      const from = METERS.find(m => m.id === fromId);
+      if (!order.length) {
+        card.innerHTML = '<div class="flex items-center justify-between gap-2"><span class="font-bold text-emerald-300">🎉 จดครบทุกตู้แล้ววันนี้</span><button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base">✕</button></div>';
+      } else {
+        const n = order[0];
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <span class="text-indigo-300 font-semibold">🧭 ตู้ถัดไปที่ใกล้ที่สุด${from ? ' (จาก ' + escHtml(from.label || from.name) + ')' : ''}</span>
+            <button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base leading-none">✕</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="min-w-0 flex-1"><div class="font-black text-base truncate">${escHtml(tagOf(n))}</div>
+              <div class="text-[10px] text-slate-400">เหลืออีก ${order.length} ตู้${order[1] ? ' • ต่อจากนั้น: ' + escHtml(order[1].label || order[1].name) : ''}</div></div>
+            <button type="button" onclick="hideNextCard(); switchView('map'); setTimeout(() => focusMeter('${n.id}'), 120)" class="px-2.5 py-2 rounded-xl bg-slate-700 font-bold shrink-0">📍</button>
+            <button type="button" onclick="hideNextCard(); openRecordModal('${n.id}')" class="px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold shrink-0">📝 จดต่อ</button>
+          </div>`;
+      }
+      card.classList.remove('hidden');
+      clearTimeout(window.__nextCardT); window.__nextCardT = setTimeout(hideNextCard, 20000);
+    }
+    function hideNextCard() { const c = document.getElementById('nextCard'); if (c) c.classList.add('hidden'); }
 
     // Leader lines: from the edge of each callout box to its pin (SVG, redrawn on every move)
     function drawLeaderLines() {
@@ -1533,15 +1712,43 @@
     // ----------------------------------------------------
     // EDIT METER INFO (name / label / type / loads) -> saved to sheet Meters (+ history names in Daily_Logs)
     // ----------------------------------------------------
-    function openMeterInfoEditor() {
+    // รายชื่อเครื่องจักรเก็บในคอลัมน์ Loads_Description เดิม คั่นด้วย " | "
+    function parseMachines(s) { return String(s || '').split(/\s*[|\n]\s*/).map(x => x.trim()).filter(Boolean); }
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function renderModalMachines(meter) {
+      const el = document.getElementById('modalLoads'); if (!el) return;
+      const list = parseMachines(meter && meter.loads);
+      el.innerHTML = list.length
+        ? list.map(m => `<span class="px-2 py-1 rounded-lg bg-white border border-slate-200 font-semibold text-slate-800">⚙️ ${escHtml(m)}</span>`).join('')
+        : '<span class="text-slate-400 italic">ยังไม่ได้ระบุ — กด "แก้ไข/เพิ่ม/ลบ" เพื่อใส่ชื่อเครื่องจักร</span>';
+    }
+    function updateMachineCount() {
+      const n = Array.from(document.querySelectorAll('#miMachines input')).filter(i => i.value.trim()).length;
+      document.getElementById('miMachineCount').innerText = '(' + n + ' เครื่อง)';
+    }
+    function addMachineRow(val, focus = true) {
+      const box = document.getElementById('miMachines');
+      const row = document.createElement('div');
+      row.className = 'flex gap-1.5';
+      row.innerHTML = `<input maxlength="80" placeholder="เช่น เครื่องผสมปูน, ปั๊มน้ำ" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+        <button type="button" title="ลบเครื่องนี้" class="shrink-0 w-9 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 font-bold">🗑</button>`;
+      const inp = row.querySelector('input'); inp.value = val; inp.oninput = updateMachineCount;
+      row.querySelector('button').onclick = () => { row.remove(); updateMachineCount(); };
+      box.appendChild(row); updateMachineCount();
+      if (focus) inp.focus();
+    }
+    function openMeterInfoEditor(machinesFirst) {
       if (!activeMeter) return;
       document.getElementById('miId').innerText = activeMeter.id;
       document.getElementById('miName').value = activeMeter.name || '';
       document.getElementById('miLabel').value = activeMeter.label || '';
       document.getElementById('miType').value = activeMeter.type || '';
-      document.getElementById('miLoads').value = activeMeter.loads || '';
+      const box = document.getElementById('miMachines'); box.innerHTML = '';
+      const list = parseMachines(activeMeter.loads);
+      (list.length ? list : ['']).forEach(m => addMachineRow(m, false));
       document.getElementById('miMsg').innerText = '';
       document.getElementById('meterInfoModal').classList.remove('hidden');
+      if (machinesFirst) { const b = document.getElementById('miMachinesBox'); if (b) b.scrollIntoView({ block: 'center' }); }
     }
 
     function closeMeterInfoEditor() {
@@ -1556,7 +1763,7 @@
         name: document.getElementById('miName').value.trim(),
         label: document.getElementById('miLabel').value.trim(),
         type: document.getElementById('miType').value.trim(),
-        loads: document.getElementById('miLoads').value.trim(),
+        loads: Array.from(document.querySelectorAll('#miMachines input')).map(i => i.value.replace(/[|\n]/g, ' ').trim()).filter(Boolean).join(' | '),
         pin: document.getElementById('miPin').value.trim()
       };
       if (!payload.name) { msg.innerText = 'กรุณาใส่ชื่อตู้'; return; }
@@ -1572,7 +1779,7 @@
           activeMeter.loads = payload.loads;
           document.getElementById('modalMeterId').innerText = activeMeter.name;
           document.getElementById('modalCabinetType').innerText = activeMeter.type;
-          document.getElementById('modalLoads').innerText = activeMeter.loads;
+          renderModalMachines(activeMeter);
           closeMeterInfoEditor();
           renderHotspots(); renderCards(); renderDashboard();
           showToast('✓ อัปเดตข้อมูลตู้แล้ว' + (res.updatedRows ? ' (เปลี่ยนชื่อย้อนหลัง ' + res.updatedRows + ' แถว)' : ''));
@@ -1625,13 +1832,13 @@
         const kwhLine = `<div class="text-[9px] text-slate-500">${kwh > 0 ? Math.round(kwh).toLocaleString() + ' kWh' : '-'}</div>`;
         if (!w.isSet) {
           missing++;
-          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
+          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
             ${head}<div class="text-[10px] font-bold text-amber-600">+ ใส่เวลา</div><div class="text-[10px] text-slate-400">ยังไม่บันทึก</div>${kwhLine}</button>`;
           continue;
         }
         const off = w.type === 'หยุด';
         const per = (w.hours > 0 && kwh > 0) ? (kwh / w.hours) : null;
-        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
+        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
           ${head}
           <div class="text-[10px] ${off ? 'text-slate-500' : 'text-indigo-700 font-semibold'}">${off ? 'หยุด' : (w.start + '–' + w.end)}${w.type === 'OT' ? ' OT' : ''}</div>
           <div class="text-[10px] text-slate-600">${w.hours} ชม.</div>
@@ -1650,14 +1857,15 @@
               <div class="text-[10px] text-slate-500">แตะการ์ดวันเพื่อใส่/แก้เวลา • ใช้ ◀ ดูย้อนหลัง${missing ? ' • <b class="text-amber-600">ยังไม่บันทึก ' + missing + ' วัน</b>' : ''}${ti.note ? ' • ' + ti.note : ''}</div>
             </div>
           </div>
-          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ บันทึกเวลาทำงาน</button>
+          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ <span class="hidden sm:inline">บันทึก</span>เวลาทำงาน</button>
         </div>
         <div class="flex items-center justify-between mb-1 text-[11px]">
           <button type="button" onclick="shiftWorkStrip(-1)" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold">◀ ย้อนหลัง</button>
           <span class="font-semibold text-slate-600">${rangeTxt}</span>
           <button type="button" onclick="shiftWorkStrip(1)" ${workStripOffset >= 0 ? 'disabled' : ''} class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-30">ถัดไป ▶</button>
         </div>
-        <div class="grid grid-cols-7 gap-1">${rows}</div>`;
+        <div id="workStripRow" class="flex gap-1.5 overflow-x-auto no-scrollbar snap-x sm:grid sm:grid-cols-7 sm:gap-1">${rows}</div>`;
+      const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth;
     }
 
     function openWorkDayEditor(dStr) {
@@ -1757,9 +1965,53 @@
 
     // Render Cards in List View
     let currentFilter = 'all';
+    const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
+    function renderListChips() {
+      const el = document.getElementById('listChips'); if (!el) return;
+      const done = METERS.filter(m => !!recordsData[m.id]).length, all = METERS.length;
+      const routeChip = `<button type="button" onclick="toggleRoute()" class="mchip" style="${routeOn ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : 'color:#4338ca;border-color:#a5b4fc'}">🧭 เรียงตามเส้นทาง</button>`;
+      const chip = (k, txt) => `<button type="button" onclick="filterStatus('${k}')" class="mchip ${currentFilter === k ? 'on-' + k : ''}">${txt}</button>`;
+      el.innerHTML = chip('all', 'ทั้งหมด ' + all) + chip('pending', '⚠️ รอจด ' + (all - done)) + chip('done', '✓ จดแล้ว ' + done) + routeChip;
+    }
     function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
+      renderListChips();
+      if (isPhone()) {
+        let listOrder = METERS, stepOf = {};
+        if (routeOn) {
+          const r = planRoute(defaultRouteStart());
+          r.order.forEach((m, i) => stepOf[m.id] = i + 1);
+          listOrder = r.order.concat(METERS.filter(m => !stepOf[m.id]));
+        }
+        listOrder.forEach(meter => {
+          const rec = recordsData[meter.id], ok = !!rec;
+          if (currentFilter === 'pending' && ok) return;
+          if (currentFilter === 'done' && !ok) return;
+          const unit = rec ? (rec.unit || 'kWh') : 'kWh';
+          const fmt = v => Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 6 });
+          const sub = ok
+            ? `<span class="text-emerald-700 font-semibold">${fmt(rec.currentReading)} ${unit}</span> <span class="text-emerald-600">(${Number(rec.diff) >= 0 ? '+' : ''}${fmt(rec.diff)})</span>`
+            : `ครั้งก่อน <span class="font-mono text-slate-700">${fmt(meter.defaultPrev)}</span> ${unit}`;
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.onclick = () => openRecordModal(meter.id);
+          row.className = `w-full text-left bg-white rounded-2xl border px-3 py-2.5 flex items-center gap-3 active:scale-[.98] transition ${ok ? 'border-emerald-200' : 'border-slate-200'}`;
+          row.innerHTML = `
+            <div class="w-11 h-11 rounded-xl shrink-0 flex flex-col items-center justify-center font-black leading-none ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+              <span class="text-[9px] font-bold opacity-70">${(meter.label || '').replace(/[0-9.]+$/, '') || 'ตู้'}</span>
+              <span class="text-sm">${(meter.label || '').match(/[0-9]+/) ? meter.label.match(/[0-9]+/)[0] : ok ? '✓' : '!'}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-slate-900 text-[15px] truncate">${stepOf[meter.id] ? `<span class="inline-flex w-5 h-5 mr-1 rounded-full ${stepOf[meter.id] === 1 ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-300'} text-[11px] font-black items-center justify-center align-middle">${stepOf[meter.id]}</span>` : ''}${meter.name}</div>
+              <div class="text-[12px] text-slate-500 truncate">${sub}</div>
+            </div>
+            <span class="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-500 text-slate-950'}">${ok ? '✓ แก้ไข' : '📝 จด'}</span>`;
+          container.appendChild(row);
+        });
+        if (!container.children.length) container.innerHTML = '<div class="text-center text-sm text-slate-400 py-10">ไม่มีรายการ</div>';
+        return;
+      }
 
       METERS.forEach(meter => {
         const isRecorded = !!recordsData[meter.id];
@@ -1861,6 +2113,8 @@
       btnList.className = inactiveClass;
       if (btnDash) btnDash.className = inactiveClass;
 
+      document.querySelectorAll('#mobileNav [data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === view));
+      window.scrollTo(0, 0);
       if (view === 'map') {
         viewMap.classList.remove('hidden');
         btnMap.className = activeClass;
@@ -1873,6 +2127,7 @@
         if (viewDashboard) viewDashboard.classList.remove('hidden');
         if (btnDash) btnDash.className = activeClass;
         renderDashboard();
+        requestAnimationFrame(() => { const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth; });
       }
     }
 
@@ -1886,6 +2141,7 @@
       document.getElementById('totalCount').innerText = total;
       document.getElementById('progressBar').style.width = percent + '%';
       document.getElementById('percentText').innerText = percent + '%';
+      const mR = document.getElementById('mRecorded'); if (mR) { mR.innerText = recorded; document.getElementById('mTotal').innerText = total; document.getElementById('mPercent').innerText = percent + '%'; document.getElementById('mProgressBar').style.width = percent + '%'; }
 
       document.getElementById('pendingBadgeCount').innerText = pending;
       document.getElementById('doneBadgeCount').innerText = recorded;
@@ -2463,7 +2719,7 @@
       document.getElementById('formMeterId').value = meter.id;
       document.getElementById('modalMeterId').innerText = meter.name;
       document.getElementById('modalCabinetType').innerText = meter.type;
-      document.getElementById('modalLoads').innerText = meter.loads;
+      renderModalMachines(meter);
 
       // เลขและหน่วยครั้งก่อนหน้า (เพื่อใช้ตรวจจับการขยับหน่วยในอนาคต เช่น kWh ➔ MWh)
       const prevVal = existing ? Number(existing.prevReading || 0) : Number(meter.defaultPrev || 0);
@@ -2724,9 +2980,11 @@
               renderHotspots();
               renderCards();
               renderDashboard();
+              const savedId = activeMeter.id;
               closeRecordModal();
               showToast(`✓ บันทึกค่า ${activeMeter.name} ลง Google Sheet สำเร็จ` + (res.data && res.data.photoUrl ? ' + รูป 📷' : ''));
               if (res.photoError) alert('บันทึกค่ามิเตอร์แล้ว แต่อัปโหลดรูปไม่สำเร็จ:\n' + res.photoError + '\n\nลองเปิดจุดนี้แล้วแนบรูปใหม่อีกครั้ง');
+              try { showNextSuggestion(savedId); } catch (e) { console.warn(e); }
             } else {
               alert('ข้อผิดพลาดจาก Google Sheets: ' + (res ? res.message : 'ไม่ทราบสาเหตุ'));
             }
