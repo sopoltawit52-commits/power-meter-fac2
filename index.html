@@ -2351,6 +2351,13 @@
 
     // ---- พลังงานของแต่ละตู้ในช่วงที่เลือก (ใช้ร่วมกันทั้งการ์ด KPI, รายการอันดับ และกราฟเทียบ 15 จุด) ----
     // วันนี้ = ค่ารอบจดล่าสุด ปรับเป็นต่อ 24 ชม. | ช่วงเวลา = ผลรวม kWh รายวัน (แบ่งตามชั่วโมงจริง) ในช่วงนั้น
+    // ผังการจ่ายไฟของตู้ Main: EMDB รับไฟต่อจาก MDB → ไฟเข้ารวมของโรงงาน = MDB อย่างเดียว (ไม่บวก EMDB ซ้ำ)
+    // ถ้าภายหลังพบว่า EMDB รับไฟแยกจากหม้อแปลง ให้ลบบรรทัด 'F2-EMDB-01' ออก
+    const MAIN_PARENT = { 'F2-EMDB-01': 'F2-MDB-01' };
+    const isTopMain = m => !!m.isMain && !MAIN_PARENT[m.id];
+    // ตัดตู้ Main ที่ตู้แม่ของมันอยู่ในรายการเดียวกันออก (กันนับซ้ำ)
+    const topMainsOf = list => list.filter(m => !(MAIN_PARENT[m.id] && list.some(x => x.id === MAIN_PARENT[m.id])));
+
     function meterEnergyForActivePeriod(m) {
       const rec = recordsData[m.id];
       if (chartPeriodMode === 'today') {
@@ -2403,7 +2410,7 @@
       let realLogs = 0;
       METERS.forEach(m => {
         const e = energy[m.id] = meterEnergyForActivePeriod(m);
-        if (m.isMain) mainTotal += e.kwh; else subTotal += e.kwh;
+        if (m.isMain) { if (isTopMain(m)) mainTotal += e.kwh; } else subTotal += e.kwh;
         if (!m.isMain && e.kwh > 0 && (!topConsumer || e.kwh > topConsumer.kwh)) topConsumer = { id: m.id, label: m.label, name: m.name, kwh: e.kwh, diff: e.diff, unit: e.unit };
         if (!m.isMain) { (e.energyDates || []).forEach(d => energyDates.add(d)); Object.keys(e.byDate || {}).forEach(d => { subByDate[d] = (subByDate[d] || 0) + e.byDate[d]; }); }
         realLogs += e.real || 0;
@@ -2420,7 +2427,7 @@
       const elKwh = document.getElementById('dashTotalCombinedKwh');
       const elMwh = document.getElementById('dashTotalCombinedMwh');
       if (elKwh) elKwh.innerHTML = `${subTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span class="text-xs font-bold text-amber-400">kWh</span>`;
-      if (elMwh) elMwh.innerText = `(= ${(subTotal / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} MWh)${mainTotal > 0 ? ` · ตู้ Main วัดได้ ${fmtKwh(mainTotal)} kWh` : ''}`;
+      if (elMwh) elMwh.innerText = `(= ${(subTotal / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} MWh)${mainTotal > 0 ? ` · ไฟเข้ารวม (MDB) ${fmtKwh(mainTotal)} kWh` : ''}`;
 
       // CARD 2: จุดใช้ไฟสูงสุด (ในกลุ่มตู้ย่อย)
       const elCard2Title = document.getElementById('dashCard2Title');
@@ -2590,7 +2597,7 @@
                 ${e.hasData ? `
                   <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 mb-1.5">
                     <span>${subLine}</span>
-                    <span class="font-bold ${meter.isMain ? 'text-purple-700' : 'text-emerald-700'}">${share}% ${meter.isMain ? 'ของตู้ Main รวม' : 'ของตู้ย่อยทั้งหมด'}</span>
+                    <span class="font-bold ${meter.isMain ? 'text-purple-700' : 'text-emerald-700'}">${meter.isMain ? (isTopMain(meter) ? 'ไฟเข้ารวมของโรงงาน' : share + '% ของ MDB') : share + '% ของตู้ย่อยทั้งหมด'}</span>
                   </div>
                   <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                     <div class="${meter.isMain ? 'bg-purple-500' : 'bg-emerald-500'} h-full rounded-full transition-all duration-300" style="width: ${Math.max(share, 2)}%"></div>
@@ -2640,7 +2647,7 @@
         const diff = Number(rec.diff || 0);
         const v = diff > 0 ? per24Kwh(k, toKwh(diff, rec.unit)) : 0;
         kwh24[k] = v;
-        if (m && m.isMain) mainKwh += v; else totalCombinedKwh += v;
+        if (m && m.isMain) { if (isTopMain(m)) mainKwh += v; } else totalCombinedKwh += v;
       });
 
       const totalCombinedMwh = totalCombinedKwh / 1000;
@@ -2653,7 +2660,7 @@
       lines.push(`📊 ความคืบหน้า: จดแล้ว ${recordedCount}/${total} จุด (${percent}%)`);
       lines.push(`🔋 ไฟฟ้ารวม (ตู้ย่อย, ต่อ 24 ชม.): ${totalCombinedKwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} kWh (= ${totalCombinedMwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} MWh)`);
       lines.push(`---------------------------`);
-      if (mainKwh > 0) lines.push(`🏢 ตู้ Main วัดได้: ${mainKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh (แสดงแยก ไม่บวกรวม)`);
+      if (mainKwh > 0) lines.push(`🏢 ไฟเข้ารวม (MDB): ${mainKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh (EMDB อยู่ใต้ MDB ไม่บวกซ้ำ)`);
       lines.push(`---------------------------`);
       lines.push(`📋 อัตราการใช้ไฟแยกแต่ละจุด (% ของตู้ย่อยทั้งหมด):`);
 
@@ -3562,8 +3569,8 @@
         let subAll = 0, mainAll = 0, subShown = 0, mainShown = 0;
         METERS.forEach(m => {
           const e = en[m.id] = meterEnergyForActivePeriod(m);
-          if (m.isMain) mainAll += e.kwh; else subAll += e.kwh;
-          if (!chartExcludedIds.has(m.id)) { if (m.isMain) mainShown += e.kwh; else subShown += e.kwh; }
+          if (m.isMain) { if (isTopMain(m)) mainAll += e.kwh; } else subAll += e.kwh;
+          if (!chartExcludedIds.has(m.id)) { if (m.isMain) { if (isTopMain(m)) mainShown += e.kwh; } else subShown += e.kwh; }
         });
         let recordedInDisplayCount = 0;
         displayMeters.forEach(meter => {
@@ -3580,7 +3587,7 @@
           }
           const tAll = meter.isMain ? mainAll : subAll, tShown = meter.isMain ? mainShown : subShown;
           extraData.push({
-            name: meter.name, currentReading: e.reading, unit: e.unit, diff: e.diff, kwhEq: e.kwh,
+            id: meter.id, name: meter.name, currentReading: e.reading, unit: e.unit, diff: e.diff, kwhEq: e.kwh,
             isMain: !!meter.isMain, hasData: e.hasData, realDays: e.real, today: !!e.today,
             groupShare: (tShown > 0 && e.kwh > 0) ? (e.kwh / tShown * 100).toFixed(1) : 0,
             factoryShare: (tAll > 0 && e.kwh > 0) ? (e.kwh / tAll * 100).toFixed(1) : 0
@@ -3594,7 +3601,7 @@
         if (footerNote) {
           const parts = [];
           if (subShown > 0) parts.push(`ตู้ย่อยรวม <b>${fmtKwh(subShown)} kWh</b>`);
-          if (mainShown > 0) parts.push(`ตู้ Main รวม <b>${fmtKwh(mainShown)} kWh</b>`);
+          if (mainShown > 0) parts.push(`ไฟเข้ารวม (MDB) <b>${fmtKwh(mainShown)} kWh</b>`);
           footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span><span>ช่วง [${periodLabel}]: มีข้อมูล ${recordedInDisplayCount}/${displayMeters.length} จุด${parts.length ? ' | ' + parts.join(' · ') : ''}</span>`;
         }
       } else if (mode === 'daily' || mode === 'monthly') {
@@ -3605,11 +3612,13 @@
           return;
         }
         // ตู้ Main กับตู้ย่อย "ไม่นำมาบวกกัน" (ไฟจากตู้ Main ไหลผ่านตู้ย่อย บวกกันจะนับซ้ำ) — ถ้าเลือกทั้ง 2 กลุ่ม จะแสดงเป็น 2 ชุดข้อมูลแยกกัน
-        const subs = activeMeters.filter(m => !m.isMain), mains = activeMeters.filter(m => m.isMain);
+        const subs = activeMeters.filter(m => !m.isMain), mainsSel = activeMeters.filter(m => m.isMain), mains = topMainsOf(mainsSel);
+        const mainsNote = mains.length < mainsSel.length ? ' · ตู้ Main ใช้ MDB อย่างเดียว (EMDB รับไฟต่อจาก MDB ไม่บวกซ้ำ)' : '';
         const mixed = subs.length > 0 && mains.length > 0;
         const primList = subs.length ? subs : mains;
-        const primTitle = subs.length ? `⚡ ตู้ย่อย (${subs.length} จุด)` : `🏢 ตู้ Main (${mains.length} จุด)`;
-        const groupTitle = mixed ? `⚡ ตู้ย่อย ${subs.length} จุด + 🏢 ตู้ Main ${mains.length} จุด (แยกกัน ไม่บวกรวม)` : primTitle;
+        const mainsTitle = mains.length === 1 ? `🏢 ${mains[0].label}` : `🏢 ตู้ Main (${mains.length} จุด)`;
+        const primTitle = subs.length ? `⚡ ตู้ย่อย (${subs.length} จุด)` : mainsTitle;
+        const groupTitle = mixed ? `⚡ ตู้ย่อย ${subs.length} จุด + ${mainsTitle} (แยกกัน ไม่บวกรวม)` : primTitle;
         const keyOf = d => isMonthly ? d.substring(0, 7) : d;
         const inRange = d => isMonthly ? (chartPeriodMode === 'customMonths' ? isDateInFilter(d) : true) : isDateInFilter(d);
         const build = list => {
@@ -3666,9 +3675,9 @@
           borderColors.push(pLine);
         });
         if (mixed) {
-          series2 = { label: `🏢 ตู้ Main (${mains.length} จุด) kWh`, data: [], extra: [], bg: [], border: '#7e22ce' };
+          series2 = { label: `${mainsTitle} kWh`, data: [], extra: [], bg: [], border: '#7e22ce' };
           keys.forEach(k => {
-            const x = info(sMap[k], k, mains, `🏢 ตู้ Main (${mains.length} จุด)`);
+            const x = info(sMap[k], k, mains, mainsTitle);
             series2.data.push(x.missing ? null : x.val);
             series2.extra.push(x);
             series2.bg.push(chartType === 'bar' ? `rgba(147, 51, 234, ${x.monthPartial ? 0.3 : 0.82})` : 'rgba(147, 51, 234, 0.06)');
@@ -3677,13 +3686,13 @@
         datasetLabel = `${primTitle} kWh`;
         if (titleEl) titleEl.innerText = isMonthly ? `🗓️ การใช้ไฟรายเดือน (kWh) - ${groupTitle}` : `📈 แนวโน้มการใช้ไฟรายวัน (kWh) - ${groupTitle}`;
         if (subTitleEl) subTitleEl.innerText = isMonthly
-          ? `ช่วง [${chartPeriodMode === 'customMonths' ? periodLabel : 'ทุกเดือนที่มีข้อมูล'}] · แท่งสีจาง + * = เดือนที่ข้อมูลยังไม่ครบ (ดูค่าคาดการณ์ทั้งเดือนใน tooltip)`
-          : `ช่วง [${periodLabel}] · เส้นประ/จุดกลวง = ประมาณการ (วันที่ไม่ได้จด หรือยังไม่ครบวัน)`;
+          ? `ช่วง [${chartPeriodMode === 'customMonths' ? periodLabel : 'ทุกเดือนที่มีข้อมูล'}] · แท่งสีจาง + * = เดือนที่ข้อมูลยังไม่ครบ (ดูค่าคาดการณ์ทั้งเดือนใน tooltip)${mainsNote}`
+          : `ช่วง [${periodLabel}] · เส้นประ/จุดกลวง = ประมาณการ (วันที่ไม่ได้จด หรือยังไม่ครบวัน)${mainsNote}`;
         if (footerNote) {
           const sumOf = map => Object.values(map).reduce((a, o) => a + o.sumMeasured, 0);
           const pSum = sumOf(pMap), pN = Object.keys(pMap).length || 1;
           let txt = `ช่วงนี้: ${keys.length} ${isMonthly ? 'เดือน' : 'วัน'} | ${primTitle} รวม <b>${fmtKwh(pSum)} kWh</b> (เฉลี่ย ${fmtKwh(pSum / pN)} /${isMonthly ? 'เดือน' : 'วัน'})`;
-          if (mixed) txt += ` · 🏢 ตู้ Main รวม <b>${fmtKwh(sumOf(sMap))} kWh</b>`;
+          if (mixed) txt += ` · ${mainsTitle} รวม <b>${fmtKwh(sumOf(sMap))} kWh</b>`;
           footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full ${isMonthly ? 'bg-purple-500' : 'bg-indigo-500'} mr-1"></span><span>${txt}</span>`;
         }
       } else if (mode === 'single') {
@@ -3835,7 +3844,7 @@
                     if (d.today) lines.push(`หน่วยที่จดรอบนี้: +${Number(d.diff || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
                     else lines.push(`จดจริง ${d.realDays} วันในช่วงนี้`);
                     lines.push(`🔢 เลขมิเตอร์ล่าสุด: ${Number(d.currentReading || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
-                    lines.push(d.isMain ? `🏢 สัดส่วนของตู้ Main รวม: ${d.factoryShare}%` : `สัดส่วนของตู้ย่อยทั้งหมด: ${d.factoryShare}%`);
+                    lines.push(d.isMain ? (MAIN_PARENT[d.id] ? `🏢 คิดเป็น ${d.factoryShare}% ของ MDB (รับไฟต่อจาก MDB)` : '🏢 ไฟเข้ารวมของโรงงาน') : `สัดส่วนของตู้ย่อยทั้งหมด: ${d.factoryShare}%`);
                     if (chartFilterPreset === 'custom' && d.groupShare !== d.factoryShare) lines.push(`สัดส่วนในกลุ่มที่เลือก: ${d.groupShare}%`);
                     return lines;
                   } else if (mode === 'daily' || mode === 'monthly') {
