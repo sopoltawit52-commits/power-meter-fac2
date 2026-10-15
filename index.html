@@ -695,7 +695,7 @@
   <!-- MODAL / BOTTOM SHEET: DATA RECORDING FORM -->
     <!-- EDIT METER INFO MODAL -->
   <div id="meterInfoModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 bg-slate-950/70 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="font-bold text-slate-900 text-sm">✏️ แก้ไขข้อมูลตู้ <span id="miId" class="font-mono text-slate-500"></span></div>
         <button type="button" onclick="closeMeterInfoEditor()" class="text-slate-400 hover:text-slate-700 text-lg px-2">✕</button>
@@ -704,7 +704,14 @@
       <label class="block">ชื่อตู้ <input id="miName" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ป้ายสั้น (บนหมุด/ปุ่มลัด) <input id="miLabel" maxlength="12" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ประเภทตู้ <input id="miType" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
-      <label class="block">อุปกรณ์ควบคุม <textarea id="miLoads" rows="2" maxlength="200" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></textarea></label>
+      <div id="miMachinesBox" class="rounded-xl border border-sky-200 bg-sky-50/50 p-2 space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-800">🏭 เครื่องจักรที่ใช้ตู้นี้ <span id="miMachineCount" class="text-slate-400 font-normal"></span></span>
+          <button type="button" onclick="addMachineRow('')" class="px-2 py-1 rounded-lg bg-sky-600 text-white font-bold">+ เพิ่ม</button>
+        </div>
+        <div id="miMachines" class="space-y-1.5"></div>
+        <div class="text-[10px] text-slate-500">พิมพ์ชื่อเครื่องจักร 1 ช่องต่อ 1 เครื่อง • กด 🗑 เพื่อลบ • ช่องที่เว้นว่างจะไม่ถูกบันทึก</div>
+      </div>
       <label class="block">รหัสผ่านผู้ดูแล <input id="miPin" type="password" inputmode="numeric" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <div class="flex gap-2 pt-1">
         <button type="button" onclick="submitMeterInfo()" class="flex-1 px-3 py-2 rounded-lg bg-sky-600 text-white font-bold">💾 บันทึก</button>
@@ -780,9 +787,12 @@
             <span class="text-slate-500 font-medium">ประเภทตู้:</span>
             <span id="modalCabinetType" class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">Power Panel</span>
           </div>
-          <div class="flex justify-between items-start gap-2">
-            <span class="text-slate-500 font-medium shrink-0">อุปกรณ์ควบคุม:</span>
-            <span id="modalLoads" class="font-semibold text-slate-800 text-right">Plotter RB, Shuttering RB</span>
+          <div class="pt-1.5 border-t border-slate-200">
+            <div class="flex justify-between items-center gap-2 mb-1">
+              <span class="text-slate-500 font-medium">🏭 ตู้นี้จ่ายไฟให้เครื่องจักร:</span>
+              <button type="button" onclick="openMeterInfoEditor(true)" class="text-sky-700 font-bold underline underline-offset-2 shrink-0">✏️ แก้ไข/เพิ่ม/ลบ</button>
+            </div>
+            <div id="modalLoads" class="flex flex-wrap gap-1"></div>
           </div>
         </div>
 
@@ -1598,15 +1608,43 @@
     // ----------------------------------------------------
     // EDIT METER INFO (name / label / type / loads) -> saved to sheet Meters (+ history names in Daily_Logs)
     // ----------------------------------------------------
-    function openMeterInfoEditor() {
+    // รายชื่อเครื่องจักรเก็บในคอลัมน์ Loads_Description เดิม คั่นด้วย " | "
+    function parseMachines(s) { return String(s || '').split(/\s*[|\n]\s*/).map(x => x.trim()).filter(Boolean); }
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function renderModalMachines(meter) {
+      const el = document.getElementById('modalLoads'); if (!el) return;
+      const list = parseMachines(meter && meter.loads);
+      el.innerHTML = list.length
+        ? list.map(m => `<span class="px-2 py-1 rounded-lg bg-white border border-slate-200 font-semibold text-slate-800">⚙️ ${escHtml(m)}</span>`).join('')
+        : '<span class="text-slate-400 italic">ยังไม่ได้ระบุ — กด "แก้ไข/เพิ่ม/ลบ" เพื่อใส่ชื่อเครื่องจักร</span>';
+    }
+    function updateMachineCount() {
+      const n = Array.from(document.querySelectorAll('#miMachines input')).filter(i => i.value.trim()).length;
+      document.getElementById('miMachineCount').innerText = '(' + n + ' เครื่อง)';
+    }
+    function addMachineRow(val, focus = true) {
+      const box = document.getElementById('miMachines');
+      const row = document.createElement('div');
+      row.className = 'flex gap-1.5';
+      row.innerHTML = `<input maxlength="80" placeholder="เช่น เครื่องผสมปูน, ปั๊มน้ำ" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+        <button type="button" title="ลบเครื่องนี้" class="shrink-0 w-9 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 font-bold">🗑</button>`;
+      const inp = row.querySelector('input'); inp.value = val; inp.oninput = updateMachineCount;
+      row.querySelector('button').onclick = () => { row.remove(); updateMachineCount(); };
+      box.appendChild(row); updateMachineCount();
+      if (focus) inp.focus();
+    }
+    function openMeterInfoEditor(machinesFirst) {
       if (!activeMeter) return;
       document.getElementById('miId').innerText = activeMeter.id;
       document.getElementById('miName').value = activeMeter.name || '';
       document.getElementById('miLabel').value = activeMeter.label || '';
       document.getElementById('miType').value = activeMeter.type || '';
-      document.getElementById('miLoads').value = activeMeter.loads || '';
+      const box = document.getElementById('miMachines'); box.innerHTML = '';
+      const list = parseMachines(activeMeter.loads);
+      (list.length ? list : ['']).forEach(m => addMachineRow(m, false));
       document.getElementById('miMsg').innerText = '';
       document.getElementById('meterInfoModal').classList.remove('hidden');
+      if (machinesFirst) { const b = document.getElementById('miMachinesBox'); if (b) b.scrollIntoView({ block: 'center' }); }
     }
 
     function closeMeterInfoEditor() {
@@ -1621,7 +1659,7 @@
         name: document.getElementById('miName').value.trim(),
         label: document.getElementById('miLabel').value.trim(),
         type: document.getElementById('miType').value.trim(),
-        loads: document.getElementById('miLoads').value.trim(),
+        loads: Array.from(document.querySelectorAll('#miMachines input')).map(i => i.value.replace(/[|\n]/g, ' ').trim()).filter(Boolean).join(' | '),
         pin: document.getElementById('miPin').value.trim()
       };
       if (!payload.name) { msg.innerText = 'กรุณาใส่ชื่อตู้'; return; }
@@ -1637,7 +1675,7 @@
           activeMeter.loads = payload.loads;
           document.getElementById('modalMeterId').innerText = activeMeter.name;
           document.getElementById('modalCabinetType').innerText = activeMeter.type;
-          document.getElementById('modalLoads').innerText = activeMeter.loads;
+          renderModalMachines(activeMeter);
           closeMeterInfoEditor();
           renderHotspots(); renderCards(); renderDashboard();
           showToast('✓ อัปเดตข้อมูลตู้แล้ว' + (res.updatedRows ? ' (เปลี่ยนชื่อย้อนหลัง ' + res.updatedRows + ' แถว)' : ''));
@@ -2715,7 +2753,7 @@ function toggleDashTotalMode() {
       document.getElementById('formMeterId').value = meter.id;
       document.getElementById('modalMeterId').innerText = meter.name;
       document.getElementById('modalCabinetType').innerText = meter.type;
-      document.getElementById('modalLoads').innerText = meter.loads;
+      renderModalMachines(meter);
 
       // เลขและหน่วยครั้งก่อนหน้า (เพื่อใช้ตรวจจับการขยับหน่วยในอนาคต เช่น kWh ➔ MWh)
       const prevVal = existing ? Number(existing.prevReading || 0) : Number(meter.defaultPrev || 0);
