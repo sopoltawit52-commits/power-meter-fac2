@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>Power Meter Fac.2</title>
   <meta name="theme-color" content="#0f172a">
   <link rel="manifest" href="manifest.webmanifest">
@@ -67,6 +67,8 @@
       if (!getKey()) { askKey(''); return; }
       call('getFloorPlan', []).then(src => { const im = document.getElementById('floorPlanImg'); if (im && src) im.src = src; }).catch(() => {});
     });
+    const setHdr = () => { const h = document.getElementById('appHeader'); if (h) document.documentElement.style.setProperty('--hdrH', h.offsetHeight + 'px'); };
+    window.addEventListener('DOMContentLoaded', setHdr); window.addEventListener('resize', setHdr); window.addEventListener('load', setHdr);
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   })();
   </script>
@@ -101,23 +103,45 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    /* ===== มือถือ: หน้าตาแบบแอป (จอกว้างไม่เกิน 639px) ===== */
+    html, body { overflow-x: hidden; }
+    #appHeader { padding-top: env(safe-area-inset-top); }
+    #mobileNav { padding-bottom: env(safe-area-inset-bottom); }
+    @media (max-width: 639px) {
+      body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+      #viewMap { flex: none; height: calc(100dvh - var(--hdrH, 76px) - 80px - env(safe-area-inset-bottom)); min-height: 360px; border-radius: 16px; }
+      #mapViewport { min-height: 0 !important; }
+      #viewDashboard { padding-bottom: 8px; }
+      .kpi-head { flex-wrap: wrap; gap: 4px; }
+      input, select, textarea { font-size: 16px !important; } /* กัน iPhone ซูมเองตอนแตะช่องกรอก */
+      #fltAll, #fltPending, #fltDone, #btnLayoutEdit { padding: 5px 10px; font-size: 12px; flex-shrink: 0; border-radius: 9999px; }
+    }
+    .mnav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 7px 0 6px; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
+    .mnav-btn .ico { font-size: 20px; line-height: 1; filter: grayscale(1); opacity: .75; transition: transform .15s; }
+    .mnav-btn.active { color: #fbbf24; }
+    .mnav-btn.active .ico { filter: none; opacity: 1; transform: translateY(-1px) scale(1.08); }
+    .mnav-btn.active::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 4px 4px; background: #f59e0b; }
+    .mchip { flex-shrink: 0; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #475569; }
+    .mchip.on-all { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .mchip.on-pending { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
+    .mchip.on-done { background: #059669; color: #fff; border-color: #059669; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased select-none">
 
   <!-- TOP APP BAR -->
-  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+  <header id="appHeader" class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
       
       <!-- Brand & Date -->
       <div class="flex items-center space-x-2.5 min-w-0">
-        <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-lg text-slate-950 shadow-md shrink-0">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-base sm:text-lg text-slate-950 shadow-md shrink-0">
           ⚡
         </div>
         <div class="min-w-0">
           <h1 class="text-sm sm:text-base font-bold text-white truncate flex items-center gap-1.5">
             <span>Power Meter Fac.2</span>
-            <span class="text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
+            <span class="hidden sm:inline text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
           </h1>
           <p class="text-[11px] text-slate-400 truncate" id="currentDateDisplay">กำลังโหลดวันที่...</p>
         </div>
@@ -146,8 +170,8 @@
           <span id="percentText" class="text-[11px] font-semibold text-emerald-400">0%</span>
         </div>
 
-        <!-- View Switcher -->
-        <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
+        <!-- View Switcher (มือถือใช้แถบเมนูด้านล่างแทน) -->
+        <div class="hidden sm:inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
           <button id="btnMapView" onclick="switchView('map')" class="px-2.5 py-1 rounded-md font-medium bg-amber-500 text-slate-950 shadow transition-all">
             🗺️ ผัง
           </button>
@@ -160,12 +184,18 @@
         </div>
 
         <!-- Sheet Log Button -->
-        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1 shadow transition">
+        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="hidden sm:flex p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium items-center gap-1 shadow transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           <span class="hidden md:inline">ตารางชีท</span>
         </button>
       </div>
 
+    </div>
+    <!-- มือถือ: แถบความคืบหน้าวันนี้ -->
+    <div class="sm:hidden px-3 pb-2 -mt-0.5 flex items-center gap-2 text-[11px]">
+      <span class="text-slate-300 shrink-0">จดแล้ว <b id="mRecorded" class="text-amber-400">0</b>/<b id="mTotal">15</b> ตู้</span>
+      <div class="flex-1 bg-slate-700 rounded-full h-1.5 overflow-hidden"><div id="mProgressBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div></div>
+      <span id="mPercent" class="font-semibold text-emerald-400 shrink-0">0%</span>
     </div>
   </header>
 
@@ -176,20 +206,20 @@
     <div id="viewMap" class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
 
       <!-- TOOLBAR: Quick Filter & Guide Hint -->
-      <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-1.5 text-slate-600">
+      <div class="px-2 sm:px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="hidden sm:flex items-center gap-1.5 text-slate-600">
           <span class="font-bold text-slate-900">แผนผังโรงงาน:</span>
           <span class="text-slate-500 hidden sm:inline">ใช้นิ้วเลื่อน / จีบนิ้วเพื่อย่อ-ขยาย</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-semibold">⚠️ รอจด</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-900 font-semibold">✓ จดแล้ว</span>
         </div>
 
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1.5 sm:gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
           <button onclick="filterStatus('all')" id="fltAll" class="px-2 py-0.5 text-[11px] rounded font-semibold bg-slate-900 text-white">ทั้งหมด (15)</button>
           <button onclick="filterStatus('pending')" id="fltPending" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">รอจด (<span id="pendingBadgeCount">15</span>)</button>
           <button onclick="filterStatus('done')" id="fltDone" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">จดแล้ว (<span id="doneBadgeCount">0</span>)</button>
           <button onclick="toggleLayoutEdit()" id="btnLayoutEdit" title="ลากจุดและกล่องชื่อบนแผนผัง" class="px-2 py-0.5 text-[11px] rounded font-medium border border-sky-300 text-sky-700">✏️ จัดตำแหน่ง</button>
-          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
+          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="hidden sm:inline-block text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
         </div>
       </div>
 
@@ -246,7 +276,7 @@
 
       <!-- QUICK SELECTOR RIBBON (Swipable carousel at bottom of map for fast mobile selection) -->
       <div class="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1">
-        <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+        <div class="hidden sm:flex items-center justify-between text-[11px] text-slate-400 px-1">
           <span class="font-semibold text-slate-300">⚡ เลือกจุดตรวจด่วน (แตะเพื่อโฟกัส):</span>
           <span class="text-[10px] text-slate-500">เลื่อนซ้าย-ขวาได้</span>
         </div>
@@ -259,7 +289,8 @@
 
     <!-- VIEW 2: LIST VIEW -->
     <div id="viewList" class="hidden space-y-3">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="cardsContainer">
+      <div id="listChips" class="sm:hidden flex gap-1.5 overflow-x-auto no-scrollbar -mx-0.5 px-0.5"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="cardsContainer">
         <!-- Rendered by JS -->
       </div>
     </div>
@@ -310,7 +341,7 @@
         
         <!-- CARD 1: Unified Factory Total (รวมทุกหน่วยเป็นก้อนเดียวในองค์รวม) -->
         <div class="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-blue-500/40 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard1Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
               <span>⚡</span> รวมไฟทั้งโรงงาน
             </span>
@@ -330,7 +361,7 @@
 
         <!-- CARD 2: Top Peak Consumer (จุดที่ใช้อัตราไฟสูงสุด) -->
         <div class="bg-gradient-to-br from-purple-950/90 to-slate-900 border border-purple-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard2Title" class="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1">
               <span>🔥</span> จุดใช้ไฟสูงสุด
             </span>
@@ -350,7 +381,7 @@
 
         <!-- CARD 3: Progress & Completion -->
         <div class="bg-gradient-to-br from-emerald-950/90 to-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard3Title" class="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1">
               <span>✓</span> จดแล้ว
             </span>
@@ -371,7 +402,7 @@
 
         <!-- CARD 4: Pending & Inspector -->
         <div class="bg-gradient-to-br from-amber-950/90 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-1">
+          <div class="kpi-head flex items-center justify-between mb-1">
             <span id="dashCard4Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
               <span>⚠️</span> รอจด
             </span>
@@ -652,6 +683,14 @@
     </div>
 
   </main>
+
+  <!-- มือถือ: เมนูด้านล่างแบบแอป -->
+  <nav id="mobileNav" class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex">
+    <button type="button" data-v="map" onclick="switchView('map')" class="mnav-btn active"><span class="ico">🗺️</span>ผัง</button>
+    <button type="button" data-v="list" onclick="switchView('list')" class="mnav-btn"><span class="ico">📋</span>รายการจด</button>
+    <button type="button" data-v="dashboard" onclick="switchView('dashboard')" class="mnav-btn"><span class="ico">📊</span>สรุป</button>
+    <button type="button" onclick="openTableModal()" class="mnav-btn"><span class="ico">📄</span>ตาราง</button>
+  </nav>
 
   <!-- MODAL / BOTTOM SHEET: DATA RECORDING FORM -->
     <!-- EDIT METER INFO MODAL -->
@@ -1651,13 +1690,13 @@
         const kwhLine = `<div class="text-[9px] text-slate-500">${kwh > 0 ? Math.round(kwh).toLocaleString() + ' kWh' : '-'}</div>`;
         if (!w.isSet) {
           missing++;
-          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
+          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
             ${head}<div class="text-[10px] font-bold text-amber-600">+ ใส่เวลา</div><div class="text-[10px] text-slate-400">ยังไม่บันทึก</div>${kwhLine}</button>`;
           continue;
         }
         const off = w.type === 'หยุด';
         const per = (w.hours > 0 && kwh > 0) ? (kwh / w.hours) : null;
-        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
+        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
           ${head}
           <div class="text-[10px] ${off ? 'text-slate-500' : 'text-indigo-700 font-semibold'}">${off ? 'หยุด' : (w.start + '–' + w.end)}${w.type === 'OT' ? ' OT' : ''}</div>
           <div class="text-[10px] text-slate-600">${w.hours} ชม.</div>
@@ -1676,14 +1715,15 @@
               <div class="text-[10px] text-slate-500">แตะการ์ดวันเพื่อใส่/แก้เวลา • ใช้ ◀ ดูย้อนหลัง${missing ? ' • <b class="text-amber-600">ยังไม่บันทึก ' + missing + ' วัน</b>' : ''}${ti.note ? ' • ' + ti.note : ''}</div>
             </div>
           </div>
-          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ บันทึกเวลาทำงาน</button>
+          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ <span class="hidden sm:inline">บันทึก</span>เวลาทำงาน</button>
         </div>
         <div class="flex items-center justify-between mb-1 text-[11px]">
           <button type="button" onclick="shiftWorkStrip(-1)" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold">◀ ย้อนหลัง</button>
           <span class="font-semibold text-slate-600">${rangeTxt}</span>
           <button type="button" onclick="shiftWorkStrip(1)" ${workStripOffset >= 0 ? 'disabled' : ''} class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-30">ถัดไป ▶</button>
         </div>
-        <div class="grid grid-cols-7 gap-1">${rows}</div>`;
+        <div id="workStripRow" class="flex gap-1.5 overflow-x-auto no-scrollbar snap-x sm:grid sm:grid-cols-7 sm:gap-1">${rows}</div>`;
+      const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth;
     }
 
     function openWorkDayEditor(dStr) {
@@ -1783,9 +1823,46 @@
 
     // Render Cards in List View
     let currentFilter = 'all';
+    const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
+    function renderListChips() {
+      const el = document.getElementById('listChips'); if (!el) return;
+      const done = METERS.filter(m => !!recordsData[m.id]).length, all = METERS.length;
+      const chip = (k, txt) => `<button type="button" onclick="filterStatus('${k}')" class="mchip ${currentFilter === k ? 'on-' + k : ''}">${txt}</button>`;
+      el.innerHTML = chip('all', 'ทั้งหมด ' + all) + chip('pending', '⚠️ รอจด ' + (all - done)) + chip('done', '✓ จดแล้ว ' + done);
+    }
     function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
+      renderListChips();
+      if (isPhone()) {
+        METERS.forEach(meter => {
+          const rec = recordsData[meter.id], ok = !!rec;
+          if (currentFilter === 'pending' && ok) return;
+          if (currentFilter === 'done' && !ok) return;
+          const unit = rec ? (rec.unit || 'kWh') : 'kWh';
+          const fmt = v => Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 6 });
+          const sub = ok
+            ? `<span class="text-emerald-700 font-semibold">${fmt(rec.currentReading)} ${unit}</span> <span class="text-emerald-600">(${Number(rec.diff) >= 0 ? '+' : ''}${fmt(rec.diff)})</span>`
+            : `ครั้งก่อน <span class="font-mono text-slate-700">${fmt(meter.defaultPrev)}</span> ${unit}`;
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.onclick = () => openRecordModal(meter.id);
+          row.className = `w-full text-left bg-white rounded-2xl border px-3 py-2.5 flex items-center gap-3 active:scale-[.98] transition ${ok ? 'border-emerald-200' : 'border-slate-200'}`;
+          row.innerHTML = `
+            <div class="w-11 h-11 rounded-xl shrink-0 flex flex-col items-center justify-center font-black leading-none ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+              <span class="text-[9px] font-bold opacity-70">${(meter.label || '').replace(/[0-9.]+$/, '') || 'ตู้'}</span>
+              <span class="text-sm">${(meter.label || '').match(/[0-9]+/) ? meter.label.match(/[0-9]+/)[0] : ok ? '✓' : '!'}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-slate-900 text-[15px] truncate">${meter.name}</div>
+              <div class="text-[12px] text-slate-500 truncate">${sub}</div>
+            </div>
+            <span class="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-500 text-slate-950'}">${ok ? '✓ แก้ไข' : '📝 จด'}</span>`;
+          container.appendChild(row);
+        });
+        if (!container.children.length) container.innerHTML = '<div class="text-center text-sm text-slate-400 py-10">ไม่มีรายการ</div>';
+        return;
+      }
 
       METERS.forEach(meter => {
         const isRecorded = !!recordsData[meter.id];
@@ -1887,6 +1964,8 @@
       btnList.className = inactiveClass;
       if (btnDash) btnDash.className = inactiveClass;
 
+      document.querySelectorAll('#mobileNav [data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === view));
+      window.scrollTo(0, 0);
       if (view === 'map') {
         viewMap.classList.remove('hidden');
         btnMap.className = activeClass;
@@ -1899,6 +1978,7 @@
         if (viewDashboard) viewDashboard.classList.remove('hidden');
         if (btnDash) btnDash.className = activeClass;
         renderDashboard();
+        requestAnimationFrame(() => { const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth; });
       }
     }
 
@@ -1912,6 +1992,7 @@
       document.getElementById('totalCount').innerText = total;
       document.getElementById('progressBar').style.width = percent + '%';
       document.getElementById('percentText').innerText = percent + '%';
+      const mR = document.getElementById('mRecorded'); if (mR) { mR.innerText = recorded; document.getElementById('mTotal').innerText = total; document.getElementById('mPercent').innerText = percent + '%'; document.getElementById('mProgressBar').style.width = percent + '%'; }
 
       document.getElementById('pendingBadgeCount').innerText = pending;
       document.getElementById('doneBadgeCount').innerText = recorded;
