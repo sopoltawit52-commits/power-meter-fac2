@@ -3524,9 +3524,17 @@
       for (let d = s; d <= rg.end; d = addDaysStr(d, 1)) out.push(d);
       return out;
     }
+    // วันที่จดล่าสุดของทั้งกลุ่ม — วันที่ "ยังไม่ครบวัน" คือวันนี้หรือวันที่ยังไม่มีรอบจดถัดไปเท่านั้น
+    // (ตู้ที่หยุดจดไปนานๆ เช่น จดครั้งสุดท้าย 13/10 จะไม่ทำให้วันที่ 13/10 ของทั้งกลุ่มกลายเป็น "ยังไม่ครบวัน")
+    function readFrontier(list) {
+      let f = '';
+      (list || METERS).forEach(m => { const pts = getAllPointsForMeter(m.id); for (let i = pts.length - 1; i >= 0; i--) { if (!pts[i].filler) { if (pts[i].date > f) f = pts[i].date; break; } } });
+      return f;
+    }
+    let DAY_FRONT = '';
     function meterDayMap(m) {
       const o = {};
-      getAllPointsForMeter(m.id).forEach(p => { o[p.date] = { kwh: Number(p.kwhEq || 0), real: !p.filler, partial: !!p.partial }; });
+      getAllPointsForMeter(m.id).forEach(p => { o[p.date] = { kwh: Number(p.kwhEq || 0), real: !p.filler, partial: !!p.partial && (!DAY_FRONT || p.date >= DAY_FRONT) }; });
       return o;
     }
     function chartGroupLists() {
@@ -3545,6 +3553,7 @@
     function renderExtraChart(mode, titleEl, subTitleEl, footerNote, periodLabel) {
       const days = rangeDays(62);
       const today = getFormatDateStr(new Date());
+      DAY_FRONT = readFrontier();
       const setFoot = (dot, html) => { if (footerNote) footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full ${dot} mr-1"></span><span>${html}</span>`; };
       const empty = (t, d) => { if (chartInstance) { chartInstance.destroy(); chartInstance = null; } showChartEmptyState(t, d); setFoot('bg-slate-400', 'ไม่มีข้อมูลในช่วงเวลาที่เลือก'); };
 
@@ -3594,11 +3603,11 @@
         const maps = g.list.map(meterDayMap);
         const L = [], kV = [], hV = [], info = [];
         days.forEach(d => {
-          let k = 0, n = 0, part = d === today; maps.forEach(mp => { if (mp[d]) { k += mp[d].kwh; n++; if (mp[d].partial) part = true; } });
+          let k = 0, n = 0, part = d === today; const miss = []; maps.forEach((mp, mi) => { if (mp[d]) { k += mp[d].kwh; n++; if (mp[d].partial) part = true; } else miss.push(g.list[mi].label); });
           if (!n) return;
           const w = getWorkInfo(d);
           const per = (w.isSet && w.type !== 'หยุด' && w.hours > 0 && !part) ? k / w.hours : null;
-          L.push(dmLabel(d) + (part ? '*' : '')); kV.push(k); hV.push(per); info.push({ d: d, k: k, w: w, per: per, part: part });
+          L.push(dmLabel(d) + (part ? '*' : '')); kV.push(k); hV.push(per); info.push({ d: d, k: k, w: w, per: per, part: part, miss: miss });
         });
         if (!L.length) return empty(`ไม่มีข้อมูลในช่วง [${periodLabel}]`, 'ลองเลือก "7 วันล่าสุด" หรือ "เดือนนี้"');
         hideChartEmptyState();
@@ -3614,7 +3623,7 @@
               tooltip: Object.assign({}, tipStyle, { callbacks: {
                 title: it => { const x = info[it[0].dataIndex]; return `วันที่ ${dmLabel(x.d)}${x.part ? ' (ยังไม่ครบวัน)' : ''}`; },
                 label: it => { const x = info[it.dataIndex]; if (it.datasetIndex === 0) return `⚡ ${fmtKwh(x.k)} kWh`; return x.per == null ? 'kWh/ชม.: -' : `⏱️ ${x.per.toFixed(1)} kWh/ชม. (${x.w.hours} ชม.)`; },
-                footer: it => { const w = info[it[0].dataIndex].w; return !w.isSet ? '🕒 ยังไม่ได้ใส่เวลาทำงาน' : w.type === 'หยุด' ? '🛑 วันหยุด (ไฟพื้นฐาน)' : `🕒 ${w.start}–${w.end} พัก ${w.brk} ชม.${w.type === 'OT' ? ' (OT)' : ''}`; } } }) },
+                footer: it => { const x = info[it[0].dataIndex], w = x.w; const t = [!w.isSet ? '🕒 ยังไม่ได้ใส่เวลาทำงาน' : w.type === 'หยุด' ? '🛑 วันหยุด (ไฟพื้นฐาน)' : `🕒 ${w.start}–${w.end} พัก ${w.brk} ชม.${w.type === 'OT' ? ' (OT)' : ''}`]; if (x.part) t.push('⏳ ยังไม่ครบวัน: รอบจดถัดไปยังไม่มา'); if (x.miss.length) t.push(`⚠️ ไม่มีข้อมูล: ${x.miss.join(', ')}`); return t; } } }) },
             scales: { x: { grid: { display: false }, ticks: axisTicks }, y: { beginAtZero: true, grid: { color: 'rgba(226,232,240,0.7)' }, ticks: Object.assign({ callback: kTick }, axisTicks) },
               y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: Object.assign({ callback: v => v + '/ชม.' }, axisTicks) } } }
         });
@@ -3894,6 +3903,7 @@
         const groupTitle = mixed ? `⚡ ตู้ย่อย ${subs.length} จุด + ${mainsTitle} (แยกกัน ไม่บวกรวม)` : primTitle;
         const keyOf = d => isMonthly ? d.substring(0, 7) : d;
         const inRange = d => isMonthly ? (chartPeriodMode === 'customMonths' ? isDateInFilter(d) : true) : isDateInFilter(d);
+        const front = readFrontier(activeMeters);
         const build = list => {
           const map = {};
           list.forEach(m => getAllPointsForMeter(m.id).forEach(p => {
@@ -3904,7 +3914,7 @@
             o.sumMeasured += kwh;
             o.sumKwh += isMonthly ? kwh : Number(p.chartKwh !== undefined ? p.chartKwh : kwh);
             if (!p.filler) o.real++;
-            if (p.partial) o.partial = true;
+            if (p.partial && p.date >= front) o.partial = true;
             o.meters.add(m.id);
             if (p.date < o.minD) o.minD = p.date;
             if (p.date > o.maxD) o.maxD = p.date;
