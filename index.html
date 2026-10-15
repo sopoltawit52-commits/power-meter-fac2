@@ -507,14 +507,23 @@
             <button type="button" onclick="switchChartMode('daily')" id="btnChartModeDaily" class="px-2.5 py-1 rounded-lg font-bold bg-white text-indigo-700 shadow-sm transition shrink-0">
               📈 เทียบรายวัน (แนวโน้ม)
             </button>
+            <button type="button" onclick="switchChartMode('stacked')" id="btnChartModeStacked" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
+              🧱 แยกตามตู้ (ซ้อน)
+            </button>
             <button type="button" onclick="switchChartMode('single')" id="btnChartModeSingle" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
               🎯 แยกรายจุด
             </button>
             <button type="button" onclick="switchChartMode('meters')" id="btnChartModeMeters" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
-              📊 เทียบ 15 จุด (แท่ง)
+              🏆 อันดับ 15 จุด (Pareto)
             </button>
             <button type="button" onclick="switchChartMode('monthly')" id="btnChartModeMonthly" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
               🗓️ เทียบรายเดือน
+            </button>
+            <button type="button" onclick="switchChartMode('balance')" id="btnChartModeBalance" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
+              ⚖️ MDB vs ตู้ย่อย
+            </button>
+            <button type="button" onclick="switchChartMode('perhour')" id="btnChartModePerhour" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
+              ⏱️ kWh/ชม. ทำงาน
             </button>
           </div>
         </div>
@@ -622,6 +631,9 @@
           <span class="text-[10px] text-slate-400 font-mono">1 MWh = 1,000 kWh</span>
         </div>
       </div>
+
+      <!-- คุณภาพข้อมูล: ค่าผิดปกติ + ตารางความครบการจด (ตู้ × วัน) -->
+      <div id="dataQualityCard" class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3"></div>
 
       <!-- DETAILED BREAKDOWN LIST (Clean, High-Legibility Mobile Cards) -->
       <div class="space-y-2">
@@ -2427,7 +2439,7 @@
       const elKwh = document.getElementById('dashTotalCombinedKwh');
       const elMwh = document.getElementById('dashTotalCombinedMwh');
       if (elKwh) elKwh.innerHTML = `${subTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span class="text-xs font-bold text-amber-400">kWh</span>`;
-      if (elMwh) elMwh.innerText = `(= ${(subTotal / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} MWh)${mainTotal > 0 ? ` · ไฟเข้ารวม (MDB) ${fmtKwh(mainTotal)} kWh` : ''}`;
+      if (elMwh) elMwh.innerText = `(= ${(subTotal / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} MWh)${mainTotal > 0 ? ` · ไฟเข้ารวม (MDB) ${fmtKwh(mainTotal)} kWh${subTotal > 0 && mainTotal > subTotal ? ` · ไม่ผ่านตู้ย่อย ${((mainTotal - subTotal) / mainTotal * 100).toFixed(0)}%` : ''}` : ''}`;
 
       // CARD 2: จุดใช้ไฟสูงสุด (ในกลุ่มตู้ย่อย)
       const elCard2Title = document.getElementById('dashCard2Title');
@@ -2622,6 +2634,7 @@
         });
       }
 
+      try { renderDataQuality(); } catch (e) { console.warn(e); }
       renderAnalyticsChart();
     }
 
@@ -3045,7 +3058,7 @@
 
     function switchChartMode(mode) {
       currentChartMode = mode;
-      if ((mode === 'daily' || mode === 'single') && chartPeriodMode === 'today') {
+      if (['daily', 'single', 'stacked', 'balance', 'perhour'].includes(mode) && chartPeriodMode === 'today') {
         setChartPeriod('last7');
         return;
       }
@@ -3491,6 +3504,258 @@
       }
     }
 
+    /* ===================== ส่วนวิเคราะห์เพิ่มเติม (v4) ===================== */
+    // กราฟโหมดใหม่: balance = MDB เทียบผลรวมตู้ย่อย, perhour = kWh ต่อชั่วโมงทำงาน, stacked = แท่งซ้อนรายวันแยกตามตู้
+    const EXTRA_MODES = ['balance', 'perhour', 'stacked'];
+    const STACK_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#94a3b8'];
+    // เกณฑ์ค่าผิดปกติ: สูงกว่า 2 เท่า หรือต่ำกว่า 30% ของค่ากลาง (median) 7 วันที่จดจริงก่อนหน้า และต่างกันเกิน 5 kWh
+    // (±30% ตามที่คิดไว้แรกๆ ทดลองกับข้อมูลจริงแล้วแจ้งเตือน 30+ ครั้งใน 2 สัปดาห์ — ถี่เกินจนไม่มีใครดู)
+    const ANOM = { hi: 2.0, lo: 0.3, minAbs: 5, baseDays: 7, minBase: 4 };
+    const fontTH = { family: "'Sarabun', sans-serif" };
+    const dmLabel = d => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
+    const medianOf = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+
+    // วันในช่วงที่เลือก (โหมด "วันนี้" ใช้ 14 วันล่าสุดแทน)
+    function rangeDays(maxDays) {
+      const rg = getActiveRange();
+      let s = chartPeriodMode === 'today' ? addDaysStr(rg.end, -13) : rg.start;
+      if (maxDays && daysBetween(s, rg.end) > maxDays) s = addDaysStr(rg.end, -(maxDays - 1));
+      const out = [];
+      for (let d = s; d <= rg.end; d = addDaysStr(d, 1)) out.push(d);
+      return out;
+    }
+    function meterDayMap(m) {
+      const o = {};
+      getAllPointsForMeter(m.id).forEach(p => { o[p.date] = { kwh: Number(p.kwhEq || 0), real: !p.filler, partial: !!p.partial }; });
+      return o;
+    }
+    function chartGroupLists() {
+      const act = METERS.filter(m => !chartExcludedIds.has(m.id));
+      const subs = act.filter(m => !m.isMain), mains = topMainsOf(act.filter(m => m.isMain));
+      return { subs: subs, mains: mains, list: subs.length ? subs : mains, title: subs.length ? `⚡ ตู้ย่อย (${subs.length} จุด)` : (mains.length === 1 ? `🏢 ${mains[0].label}` : `🏢 ตู้ Main (${mains.length} จุด)`) };
+    }
+    function drawChart(cfg) {
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(document.getElementById('analyticsChart'), cfg);
+    }
+    const tipStyle = { backgroundColor: '#0f172a', titleFont: Object.assign({ size: 13, weight: 'bold' }, fontTH), bodyFont: Object.assign({ size: 12 }, fontTH), footerFont: Object.assign({ size: 12, weight: 'bold' }, fontTH), padding: 10, cornerRadius: 10 };
+    const axisTicks = { font: Object.assign({ size: 10 }, fontTH), color: '#64748b' };
+    const kTick = v => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }));
+
+    function renderExtraChart(mode, titleEl, subTitleEl, footerNote, periodLabel) {
+      const days = rangeDays(62);
+      const today = getFormatDateStr(new Date());
+      const setFoot = (dot, html) => { if (footerNote) footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full ${dot} mr-1"></span><span>${html}</span>`; };
+      const empty = (t, d) => { if (chartInstance) { chartInstance.destroy(); chartInstance = null; } showChartEmptyState(t, d); setFoot('bg-slate-400', 'ไม่มีข้อมูลในช่วงเวลาที่เลือก'); };
+
+      if (mode === 'balance') {
+        const mdb = METERS.find(m => isTopMain(m));
+        const subs = METERS.filter(m => !m.isMain);
+        if (titleEl) titleEl.innerText = `⚖️ ไฟเข้า (${mdb ? mdb.label : 'MDB'}) เทียบผลรวมตู้ย่อย ${subs.length} ตู้`;
+        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}] · ความสูงแท่ง = ไฟเข้า MDB · เขียว = ผ่านมิเตอร์ตู้ย่อย · เทา = ไม่ผ่านมิเตอร์ตู้ย่อย (โหลดที่ไม่มีมิเตอร์ / สูญเสีย) · เส้นแดง = % ที่ไม่ผ่านมิเตอร์ (แกนขวา)`;
+        if (!mdb) return empty('ไม่พบตู้ MDB', 'ต้องมีตู้ Main อย่างน้อย 1 ตู้');
+        const mMap = meterDayMap(mdb), sMaps = subs.map(meterDayMap);
+        const L = [], subV = [], gapV = [], pctV = [], info = [];
+        days.forEach(d => {
+          const mv = mMap[d]; if (!mv) return;
+          let s = 0, n = 0; sMaps.forEach(mp => { if (mp[d]) { s += mp[d].kwh; n++; } });
+          const gap = mv.kwh - s;
+          L.push(dmLabel(d)); subV.push(Math.min(s, mv.kwh)); gapV.push(Math.max(gap, 0)); pctV.push(mv.kwh > 0 ? Math.max(gap, 0) / mv.kwh * 100 : null);
+          info.push({ d: d, mdb: mv.kwh, s: s, gap: gap, n: n, est: !mv.real || mv.partial || d === today });
+        });
+        if (!L.length) return empty(`ไม่มีข้อมูล MDB ในช่วง [${periodLabel}]`, 'ลองเลือก "7 วันล่าสุด" หรือ "เดือนนี้"');
+        hideChartEmptyState();
+        const tM = info.reduce((a, x) => a + x.mdb, 0), tS = info.reduce((a, x) => a + x.s, 0);
+        drawChart({
+          type: 'bar',
+          data: { labels: L, datasets: [
+            { label: `⚡ ผ่านตู้ย่อย ${subs.length} ตู้`, data: subV, backgroundColor: info.map(x => x.est ? 'rgba(16,185,129,0.4)' : 'rgba(16,185,129,0.85)'), stack: 's', borderRadius: 4, order: 2 },
+            { label: '❔ ไม่ผ่านมิเตอร์ตู้ย่อย', data: gapV, backgroundColor: info.map(x => x.est ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.75)'), stack: 's', borderRadius: 4, order: 2 },
+            { type: 'line', label: '% ไม่ผ่านมิเตอร์', data: pctV, yAxisID: 'y1', borderColor: '#e11d48', backgroundColor: '#e11d48', borderWidth: 2, pointRadius: 3, tension: 0.25, order: 1, spanGaps: true }
+          ] },
+          options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: true, labels: { font: Object.assign({ size: 11 }, fontTH), boxWidth: 12 } },
+              tooltip: Object.assign({}, tipStyle, { callbacks: {
+                title: it => { const x = info[it[0].dataIndex]; return `วันที่ ${dmLabel(x.d)}${x.est ? ' (มีค่าประมาณการ)' : ''}`; },
+                label: it => { const x = info[it.dataIndex]; if (it.datasetIndex === 0) return `⚡ ผ่านตู้ย่อย: ${fmtKwh(x.s)} kWh (${x.n}/${subs.length} ตู้มีข้อมูล)`; if (it.datasetIndex === 1) return x.gap < 0 ? `⚠️ ตู้ย่อยรวมมากกว่า MDB ${fmtKwh(-x.gap)} kWh — ตรวจเลขที่จด` : `❔ ไม่ผ่านมิเตอร์ย่อย: ${fmtKwh(x.gap)} kWh`; return `% ไม่ผ่านมิเตอร์: ${it.raw == null ? '-' : it.raw.toFixed(1) + '%'}`; },
+                footer: it => `🏢 ไฟเข้า MDB: ${fmtKwh(info[it[0].dataIndex].mdb)} kWh` } }) },
+            scales: { x: { stacked: true, grid: { display: false }, ticks: axisTicks }, y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(226,232,240,0.7)' }, ticks: Object.assign({ callback: kTick }, axisTicks) },
+              y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: Object.assign({ callback: v => v + '%' }, axisTicks) } } }
+        });
+        setFoot('bg-rose-500', `ช่วงนี้ ${L.length} วัน | ไฟเข้า MDB <b>${fmtKwh(tM)} kWh</b> · ผ่านตู้ย่อย <b>${fmtKwh(tS)} kWh</b> · ไม่ผ่านมิเตอร์ย่อย <b>${tM > 0 ? ((tM - tS) / tM * 100).toFixed(1) : 0}%</b> (สมมติว่าตู้ย่อยทุกตู้อยู่ใต้ MDB)`);
+        return;
+      }
+
+      if (mode === 'perhour') {
+        const g = chartGroupLists();
+        if (titleEl) titleEl.innerText = `⏱️ kWh ต่อชั่วโมงทำงาน - ${g.title}`;
+        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}] · แท่ง = kWh/วัน (ม่วง = ทำงาน, ส้ม = มี OT, เทา = วันหยุด, จาง = ยังไม่ใส่เวลาทำงาน) · เส้น = kWh/ชม. (แกนขวา) — ใส่เวลาทำงานที่แถบ 🕒 ด้านบน`;
+        if (!g.list.length) return empty('ไม่มีจุดที่เลือก', 'เลือกกลุ่มจุดด้านล่างกราฟ');
+        const maps = g.list.map(meterDayMap);
+        const L = [], kV = [], hV = [], info = [];
+        days.forEach(d => {
+          let k = 0, n = 0, part = d === today; maps.forEach(mp => { if (mp[d]) { k += mp[d].kwh; n++; if (mp[d].partial) part = true; } });
+          if (!n) return;
+          const w = getWorkInfo(d);
+          const per = (w.isSet && w.type !== 'หยุด' && w.hours > 0 && !part) ? k / w.hours : null;
+          L.push(dmLabel(d) + (part ? '*' : '')); kV.push(k); hV.push(per); info.push({ d: d, k: k, w: w, per: per, part: part });
+        });
+        if (!L.length) return empty(`ไม่มีข้อมูลในช่วง [${periodLabel}]`, 'ลองเลือก "7 วันล่าสุด" หรือ "เดือนนี้"');
+        hideChartEmptyState();
+        const col = x => !x.w.isSet ? 'rgba(99,102,241,0.25)' : x.w.type === 'หยุด' ? 'rgba(148,163,184,0.8)' : x.w.type === 'OT' ? 'rgba(245,158,11,0.85)' : 'rgba(99,102,241,0.8)';
+        drawChart({
+          type: 'bar',
+          data: { labels: L, datasets: [
+            { label: 'kWh/วัน', data: kV, backgroundColor: info.map(col), borderRadius: 4, order: 2 },
+            { type: 'line', label: 'kWh/ชม. ทำงาน', data: hV, yAxisID: 'y1', borderColor: '#059669', backgroundColor: '#059669', borderWidth: 2, pointRadius: 4, tension: 0.25, spanGaps: true, order: 1 }
+          ] },
+          options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: true, labels: { font: Object.assign({ size: 11 }, fontTH), boxWidth: 12 } },
+              tooltip: Object.assign({}, tipStyle, { callbacks: {
+                title: it => { const x = info[it[0].dataIndex]; return `วันที่ ${dmLabel(x.d)}${x.part ? ' (ยังไม่ครบวัน)' : ''}`; },
+                label: it => { const x = info[it.dataIndex]; if (it.datasetIndex === 0) return `⚡ ${fmtKwh(x.k)} kWh`; return x.per == null ? 'kWh/ชม.: -' : `⏱️ ${x.per.toFixed(1)} kWh/ชม. (${x.w.hours} ชม.)`; },
+                footer: it => { const w = info[it[0].dataIndex].w; return !w.isSet ? '🕒 ยังไม่ได้ใส่เวลาทำงาน' : w.type === 'หยุด' ? '🛑 วันหยุด (ไฟพื้นฐาน)' : `🕒 ${w.start}–${w.end} พัก ${w.brk} ชม.${w.type === 'OT' ? ' (OT)' : ''}`; } } }) },
+            scales: { x: { grid: { display: false }, ticks: axisTicks }, y: { beginAtZero: true, grid: { color: 'rgba(226,232,240,0.7)' }, ticks: Object.assign({ callback: kTick }, axisTicks) },
+              y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: Object.assign({ callback: v => v + '/ชม.' }, axisTicks) } } }
+        });
+        const work = info.filter(x => x.per != null), off = info.filter(x => x.w.isSet && x.w.type === 'หยุด' && !x.part), miss = info.filter(x => !x.w.isSet).length;
+        const avgPer = work.length ? work.reduce((a, x) => a + x.k, 0) / work.reduce((a, x) => a + x.w.hours, 0) : null;
+        const avgOff = off.length ? off.reduce((a, x) => a + x.k, 0) / off.length : null;
+        setFoot('bg-emerald-500', `${avgPer != null ? `เฉลี่ยวันทำงาน <b>${avgPer.toFixed(1)} kWh/ชม.</b> (${work.length} วัน)` : 'ยังไม่มีวันทำงานที่ใส่เวลา'}${avgOff != null ? ` · ไฟพื้นฐานวันหยุด <b>${fmtKwh(avgOff)} kWh/วัน</b> (${off.length} วัน)` : ''}${miss ? ` · <span class="text-amber-600">ยังไม่ใส่เวลา ${miss} วัน</span>` : ''}`);
+        return;
+      }
+
+      if (mode === 'stacked') {
+        const g = chartGroupLists();
+        if (titleEl) titleEl.innerText = `🧱 การใช้ไฟรายวันแยกตามตู้ - ${g.title}`;
+        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}] · แท่งซ้อน: ความสูงรวม = ไฟรวมของกลุ่ม, แต่ละสี = แต่ละตู้ (8 ตู้ที่ใช้มากที่สุด + อื่นๆ) · สีจาง = วันที่มีค่าประมาณการ`;
+        if (!g.list.length) return empty('ไม่มีจุดที่เลือก', 'เลือกกลุ่มจุดด้านล่างกราฟ');
+        const rows = g.list.map(m => { const mp = meterDayMap(m); return { m: m, mp: mp, tot: days.reduce((a, d) => a + (mp[d] ? mp[d].kwh : 0), 0) }; }).sort((a, b) => b.tot - a.tot);
+        const useDays = days.filter(d => rows.some(r => r.mp[d]));
+        if (!useDays.length) return empty(`ไม่มีข้อมูลในช่วง [${periodLabel}]`, 'ลองเลือก "7 วันล่าสุด" หรือ "เดือนนี้"');
+        hideChartEmptyState();
+        const top = rows.slice(0, 8), rest = rows.slice(8);
+        const estDay = useDays.map(d => d === today || rows.some(r => r.mp[d] && (!r.mp[d].real || r.mp[d].partial)));
+        const ds = top.map((r, i) => ({ label: r.m.label, data: useDays.map(d => r.mp[d] ? r.mp[d].kwh : 0), backgroundColor: useDays.map((d, j) => STACK_COLORS[i] + (estDay[j] ? '66' : 'dd')), stack: 's', borderRadius: 2 }));
+        if (rest.length) ds.push({ label: `อื่นๆ (${rest.length} ตู้)`, data: useDays.map(d => rest.reduce((a, r) => a + (r.mp[d] ? r.mp[d].kwh : 0), 0)), backgroundColor: useDays.map((d, j) => STACK_COLORS[8] + (estDay[j] ? '66' : 'dd')), stack: 's', borderRadius: 2 });
+        drawChart({
+          type: 'bar',
+          data: { labels: useDays.map((d, j) => dmLabel(d) + (estDay[j] ? '*' : '')), datasets: ds },
+          options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: true, position: 'bottom', labels: { font: Object.assign({ size: 10 }, fontTH), boxWidth: 10, padding: 6 } },
+              tooltip: Object.assign({}, tipStyle, { itemSort: (a, b) => b.raw - a.raw, filter: it => it.raw > 0, callbacks: {
+                title: it => `วันที่ ${useDays[it[0].dataIndex]}${estDay[it[0].dataIndex] ? ' (มีค่าประมาณการ)' : ''}`,
+                label: it => { const t = it.chart.data.datasets.reduce((a, d) => a + (d.data[it.dataIndex] || 0), 0); return `${it.dataset.label}: ${fmtKwh(it.raw)} kWh (${t > 0 ? (it.raw / t * 100).toFixed(0) : 0}%)`; },
+                footer: it => `รวม: ${fmtKwh(it.reduce((a, x) => a + x.raw, 0))} kWh` } }) },
+            scales: { x: { stacked: true, grid: { display: false }, ticks: axisTicks }, y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(226,232,240,0.7)' }, ticks: Object.assign({ callback: kTick }, axisTicks) } } }
+        });
+        const tot = rows.reduce((a, r) => a + r.tot, 0);
+        setFoot('bg-blue-500', `ช่วงนี้ ${useDays.length} วัน | รวม <b>${fmtKwh(tot)} kWh</b> · มากสุด: ${top.slice(0, 3).map(r => `${r.m.label} ${tot > 0 ? (r.tot / tot * 100).toFixed(0) : 0}%`).join(', ')}`);
+        return;
+      }
+    }
+
+    // ---- ค่าผิดปกติ (ข้อ 5) ----
+    function detectAnomalies(days) {
+      const first = days[0], last = days[days.length - 1];
+      const cells = {}, items = [];
+      METERS.forEach(m => {
+        const pts = getAllPointsForMeter(m.id).filter(p => !p.filler);
+        const hits = [];
+        pts.forEach((p, i) => {
+          if (p.date < first || p.date > last || p.partial) return; // วันล่าสุดที่ยังจดไม่ครบวัน ไม่นำมาตัดสิน
+          const v = Number(p.kwhEq || 0);
+          if (Number(p.diff || 0) < 0) { hits.push({ d: p.date, t: 'neg', v: v }); return; }
+          const prev = pts.slice(Math.max(0, i - ANOM.baseDays), i).map(q => Number(q.kwhEq || 0)).filter(x => x > 0);
+          if (prev.length < ANOM.minBase) return;
+          const b = medianOf(prev);
+          if (v > b * ANOM.hi && v - b > ANOM.minAbs) hits.push({ d: p.date, t: 'hi', v: v, b: b });
+          else if (b > ANOM.minAbs && v < b * ANOM.lo) hits.push({ d: p.date, t: 'lo', v: v, b: b });
+        });
+        hits.forEach(h => { cells[m.id + '|' + h.d] = h.t; });
+        // รวมวันติดกันที่ผิดปกติแบบเดียวกันเป็นรายการเดียว
+        hits.forEach(h => {
+          const g = items.length && items[items.length - 1];
+          if (g && g.m === m && g.t === h.t && daysBetween(g.to, h.d) <= 4) { g.to = h.d; g.n++; g.vMax = Math.max(g.vMax, h.v); g.vMin = Math.min(g.vMin, h.v); return; }
+          items.push({ m: m, t: h.t, from: h.d, to: h.d, n: 1, vMax: h.v, vMin: h.v, b: h.b });
+        });
+        // ไม่ได้จดเกิน 1 วัน (ถึงวันสุดท้ายของช่วง)
+        const lastReal = pts.length ? pts[pts.length - 1].date : null;
+        const gapDays = lastReal ? daysBetween(lastReal, last) - 1 : null;
+        if (lastReal && gapDays >= 2) items.push({ m: m, t: 'miss', from: addDaysStr(lastReal, 1), to: last, n: gapDays });
+      });
+      items.sort((a, b) => (b.to > a.to ? 1 : b.to < a.to ? -1 : 0));
+      return { cells: cells, items: items };
+    }
+
+    function renderDataQuality() {
+      const box = document.getElementById('dataQualityCard');
+      if (!box) return;
+      const days = rangeDays(31);
+      const an = detectAnomalies(days);
+      const typeTxt = { hi: ['🔺', 'สูงผิดปกติ', 'text-rose-700 bg-rose-50 border-rose-200'], lo: ['🔻', 'ต่ำผิดปกติ', 'text-sky-700 bg-sky-50 border-sky-200'], neg: ['⛔', 'เลขลดลง (ค่าติดลบ)', 'text-rose-700 bg-rose-50 border-rose-200'], miss: ['⏸️', 'ไม่ได้จด', 'text-amber-700 bg-amber-50 border-amber-200'] };
+      const rng = (a, b) => a === b ? dmLabel(a) : `${dmLabel(a)}–${dmLabel(b)}`;
+      const shown = an.items.slice(0, 8);
+      const list = shown.length ? shown.map(it => {
+        const t = typeTxt[it.t];
+        const detail = it.t === 'miss' ? `${it.n} วัน (ตั้งแต่ ${dmLabel(it.from)})`
+          : it.t === 'neg' ? rng(it.from, it.to)
+          : `${rng(it.from, it.to)} · ${it.t === 'hi' ? fmtKwh(it.vMax, 0) : fmtKwh(it.vMin, 0)} kWh/วัน (ปกติ ≈ ${fmtKwh(it.b, 0)})`;
+        return `<button type="button" onclick="openMeterTrend('${it.m.id}')" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg border ${t[2]} hover:brightness-95">
+          <span class="shrink-0">${t[0]}</span><span class="font-black shrink-0">${it.m.label}</span><span class="font-semibold shrink-0">${t[1]}</span><span class="text-slate-600 truncate">${detail}</span><span class="ml-auto shrink-0 text-[10px] text-slate-400">ดูกราฟ ›</span></button>`;
+      }).join('') : '<div class="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1.5">✓ ไม่พบค่าผิดปกติในช่วงนี้</div>';
+
+      // ตารางความครบการจด (ตู้ × วัน)
+      const realSet = {}, estSet = {};
+      METERS.forEach(m => getAllPointsForMeter(m.id).forEach(p => { if (p.filler) estSet[m.id + '|' + p.date] = 1; else realSet[m.id + '|' + p.date] = 1; }));
+      const head = days.map(d => `<th class="px-0 py-0.5 font-normal text-[9px] text-slate-400 ${new Date(d + 'T00:00:00').getDay() === 0 ? 'text-rose-400' : ''}">${+d.slice(8, 10)}</th>`).join('');
+      let realCnt = 0;
+      const body = METERS.map(m => {
+        const cells = days.map(d => {
+          const k = m.id + '|' + d, a = an.cells[k];
+          let cls = 'bg-slate-100', tip = 'ไม่มีข้อมูล';
+          if (realSet[k]) { realCnt++; cls = a ? (a === 'lo' ? 'bg-sky-400' : 'bg-rose-500') : 'bg-emerald-500'; tip = a ? typeTxt[a][1] : 'จดจริง'; }
+          else if (estSet[k]) { cls = 'bg-amber-200'; tip = 'ไม่ได้จด (ค่าประมาณการ)'; }
+          return `<td class="p-[1px]"><div title="${m.label} ${dmLabel(d)}: ${tip}" class="h-3.5 min-w-[10px] rounded-[2px] ${cls}"></div></td>`;
+        }).join('');
+        return `<tr><td class="pr-1.5 text-[10px] font-bold text-slate-700 whitespace-nowrap sticky left-0 bg-white">${m.label}</td>${cells}</tr>`;
+      }).join('');
+      const pct = days.length ? Math.round(realCnt / (METERS.length * days.length) * 100) : 0;
+
+      box.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold text-slate-800">⚠️ ค่าผิดปกติ <span class="font-normal text-slate-500">(${rng(days[0], days[days.length - 1])})</span></span>
+            <span class="text-[10px] text-slate-500">${an.items.length} รายการ${an.items.length > shown.length ? ` · แสดง ${shown.length} ล่าสุด` : ''}</span>
+          </div>
+          <div class="space-y-1 text-[11px]">${list}</div>
+          <div class="text-[10px] text-slate-400 mt-1">เกณฑ์: สูงกว่า 2 เท่า หรือต่ำกว่า 30% ของค่ากลาง 7 วันที่จดก่อนหน้า (และต่างเกิน 5 kWh) · เลขมิเตอร์ลดลง · ไม่ได้จดตั้งแต่ 2 วันขึ้นไป</div>
+        </div>
+        <div class="border-t border-slate-100 pt-2">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold text-slate-800">🗓️ ความครบการจด (ตู้ × วัน)</span>
+            <span class="text-[10px] font-bold ${pct >= 90 ? 'text-emerald-700' : 'text-amber-700'}">จดจริง ${pct}%</span>
+          </div>
+          <div class="overflow-x-auto no-scrollbar"><table class="border-separate border-spacing-0"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] text-slate-500">
+            <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500 align-middle"></i> จดจริง</span>
+            <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-amber-200 align-middle"></i> ไม่ได้จด (ประมาณการ)</span>
+            <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-rose-500 align-middle"></i> สูงผิดปกติ / ติดลบ</span>
+            <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-400 align-middle"></i> ต่ำผิดปกติ</span>
+            <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-200 align-middle"></i> ไม่มีข้อมูล</span>
+          </div>
+        </div>`;
+    }
+
+    // แตะรายการค่าผิดปกติ → เปิดกราฟแยกรายจุดของตู้นั้น
+    function openMeterTrend(meterId) {
+      selectedChartMeterId = meterId;
+      const sel = document.getElementById('chartMeterSelect'); if (sel) sel.value = meterId;
+      if (chartPeriodMode === 'today') setChartPeriod('last7');
+      switchChartMode('single');
+      const c = document.getElementById('analyticsChart'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     function renderAnalyticsChart(mode = currentChartMode, selectedMeter = selectedChartMeterId) {
       currentChartMode = mode;
       selectedChartMeterId = selectedMeter;
@@ -3501,7 +3766,7 @@
       // Filter Toolbar Visibility for 'meters', 'daily', and 'monthly' modes
       const filterWrap = document.getElementById('chartMetersFilterWrap');
       if (filterWrap) {
-        if (mode === 'meters' || mode === 'daily' || mode === 'monthly') {
+        if (['meters', 'daily', 'monthly', 'stacked', 'perhour'].includes(mode)) {
           filterWrap.classList.remove('hidden');
           updateChartPresetButtons();
           renderChartMeterChips();
@@ -3533,6 +3798,7 @@
       if (btnD) btnD.className = mode === 'daily' ? activeClass : inactiveClass;
       if (btnMo) btnMo.className = mode === 'monthly' ? activeClass : inactiveClass;
       if (btnS) btnS.className = mode === 'single' ? activeClass : inactiveClass;
+      [['btnChartModeStacked', 'stacked'], ['btnChartModeBalance', 'balance'], ['btnChartModePerhour', 'perhour']].forEach(([id, md]) => { const b = document.getElementById(id); if (b) b.className = mode === md ? activeClass : inactiveClass; });
 
       const titleEl = document.getElementById('chartTitle');
       const subTitleEl = document.getElementById('chartSubtitle');
@@ -3552,6 +3818,8 @@
       const metricType = (mode === 'single') ? chartMetricType : 'diff';
       const metricWrap = document.getElementById('chartTimeFilterWrap');
       if (metricWrap) metricWrap.classList.toggle('hidden', mode !== 'single');
+      let paretoLine = null; // เส้น % สะสม (โหมดอันดับ Pareto)
+      if (EXTRA_MODES.includes(mode)) { hideChartEmptyState(); renderExtraChart(mode, titleEl, subTitleEl, footerNote, periodLabel); return; }
 
       if (mode === 'meters') {
         hideChartEmptyState();
@@ -3562,8 +3830,8 @@
         }
         chartType = 'bar';
         const groupText = chartFilterPreset === 'subpanels' ? 'เฉพาะตู้ย่อย' : chartFilterPreset === 'mains' ? 'เฉพาะตู้ Main' : `${displayMeters.length}/${METERS.length} จุด`;
-        if (titleEl) titleEl.innerText = `📊 การใช้ไฟแต่ละจุด (kWh) - ${groupText}`;
-        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}]${chartPeriodMode === 'today' ? ' · ปรับเป็นต่อ 24 ชม.' : ''} · สีเขียว = ตู้ย่อย, สีม่วง = ตู้ Main (% คิดแยกกลุ่ม ไม่นับซ้ำ)`;
+        if (titleEl) titleEl.innerText = `🏆 อันดับการใช้ไฟ (kWh) - ${groupText}`;
+        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}]${chartPeriodMode === 'today' ? ' · ปรับเป็นต่อ 24 ชม.' : ''} · สีเขียว = ตู้ย่อย, สีม่วง = ตู้ Main (% คิดแยกกลุ่ม ไม่นับซ้ำ) · เส้นส้ม = % สะสมของตู้ย่อย (แกนขวา) — ดูว่ากี่ตู้แรกกินไฟ 80%`;
         datasetLabel = 'การใช้ไฟ (kWh)';
         const en = {};
         let subAll = 0, mainAll = 0, subShown = 0, mainShown = 0;
@@ -3572,6 +3840,11 @@
           if (m.isMain) { if (isTopMain(m)) mainAll += e.kwh; } else subAll += e.kwh;
           if (!chartExcludedIds.has(m.id)) { if (m.isMain) { if (isTopMain(m)) mainShown += e.kwh; } else subShown += e.kwh; }
         });
+        // เรียงจากมากไปน้อย (ตู้ย่อยก่อน ตู้ Main ท้าย) + เส้น % สะสมของตู้ย่อย
+        displayMeters.sort((a, b) => ((a.isMain ? 1 : 0) - (b.isMain ? 1 : 0)) || (en[b.id].kwh - en[a.id].kwh));
+        let cumSub = 0;
+        paretoLine = displayMeters.map(m => { if (m.isMain || subShown <= 0) return null; cumSub += en[m.id].kwh; return cumSub / subShown * 100; });
+        if (!paretoLine.some(v => v != null)) paretoLine = null;
         let recordedInDisplayCount = 0;
         displayMeters.forEach(meter => {
           const e = en[meter.id];
@@ -3776,6 +4049,7 @@
           labels: labels,
           datasets: [{
             label: datasetLabel,
+            yAxisID: 'y',
             data: dataValues,
             backgroundColor: bgColors,
             borderColor: borderColors,
@@ -3792,6 +4066,7 @@
             spanGaps: true
           }].concat(series2 ? [{
             label: series2.label,
+            yAxisID: 'y',
             data: series2.data,
             backgroundColor: series2.bg,
             borderColor: series2.border,
@@ -3806,6 +4081,9 @@
             pointRadius: chartType === 'line' ? 4 : 0,
             pointHoverRadius: 6,
             spanGaps: true
+          }] : []).concat(paretoLine ? [{
+            type: 'line', label: '% สะสม (ตู้ย่อย)', data: paretoLine, yAxisID: 'y1',
+            borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderWidth: 2, pointRadius: 3, tension: 0.2, fill: false, spanGaps: false
           }] : [])
         },
         options: {
@@ -3813,7 +4091,7 @@
           maintainAspectRatio: false,
           animation: { duration: 400 },
           plugins: {
-            legend: { display: !!series2, labels: { font: { family: "'Sarabun', sans-serif", size: 11 }, boxWidth: 12 } },
+            legend: { display: !!series2 || !!paretoLine, labels: { font: { family: "'Sarabun', sans-serif", size: 11 }, boxWidth: 12 } },
             tooltip: {
               backgroundColor: '#0f172a',
               titleFont: { family: "'Sarabun', sans-serif", size: 13, weight: 'bold' },
@@ -3836,6 +4114,7 @@
                 },
                 label: function(item) {
                   const idx = item.dataIndex;
+                  if (item.dataset.yAxisID === 'y1') return `📈 % สะสม (ตู้ย่อย): ${Number(item.raw).toFixed(1)}%`;
                   const d = (series2 && item.datasetIndex === 1) ? series2.extra[idx] : extraData[idx];
                   if (mode === 'meters') {
                     if (!d.hasData) return 'สถานะ: ⚠️ ยังไม่มีการบันทึกในช่วงนี้';
@@ -3906,7 +4185,8 @@
                   return Number(val).toLocaleString(undefined, { maximumFractionDigits: 1 });
                 }
               }
-            }
+            },
+            ...(paretoLine ? { y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { font: { family: "'Sarabun', sans-serif", size: 10 }, color: '#64748b', callback: v => v + '%' } } } : {})
           }
         }
       });
