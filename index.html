@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <title>Power Meter Fac.2</title>
   <meta name="theme-color" content="#0f172a">
   <link rel="manifest" href="manifest.webmanifest">
@@ -68,13 +68,11 @@
       call('getFloorPlan', []).then(src => { const im = document.getElementById('floorPlanImg'); if (im && src) im.src = src; }).catch(() => {});
       call('getTodayPhotos', []).then(m => { window.pmTodayPhotos = Object.assign(window.pmTodayPhotos || {}, m || {}); }).catch(() => {});
     });
-    const setHdr = () => { const h = document.getElementById('appHeader'); if (h) document.documentElement.style.setProperty('--hdrH', h.offsetHeight + 'px'); };
-    window.addEventListener('DOMContentLoaded', setHdr); window.addEventListener('resize', setHdr); window.addEventListener('load', setHdr);
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   })();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -104,45 +102,23 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    /* ===== มือถือ: หน้าตาแบบแอป (จอกว้างไม่เกิน 639px) ===== */
-    html, body { overflow-x: hidden; }
-    #appHeader { padding-top: env(safe-area-inset-top); }
-    #mobileNav { padding-bottom: env(safe-area-inset-bottom); }
-    @media (max-width: 639px) {
-      body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-      #viewMap { flex: none; height: calc(100dvh - var(--hdrH, 76px) - 80px - env(safe-area-inset-bottom)); min-height: 360px; border-radius: 16px; }
-      #mapViewport { min-height: 0 !important; }
-      #viewDashboard { padding-bottom: 8px; }
-      .kpi-head { flex-wrap: wrap; gap: 4px; }
-      input, select, textarea { font-size: 16px !important; } /* กัน iPhone ซูมเองตอนแตะช่องกรอก */
-      #fltAll, #fltPending, #fltDone, #btnLayoutEdit, #btnRoute { padding: 5px 10px; font-size: 12px; flex-shrink: 0; border-radius: 9999px; }
-    }
-    .mnav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 7px 0 6px; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
-    .mnav-btn .ico { font-size: 20px; line-height: 1; filter: grayscale(1); opacity: .75; transition: transform .15s; }
-    .mnav-btn.active { color: #fbbf24; }
-    .mnav-btn.active .ico { filter: none; opacity: 1; transform: translateY(-1px) scale(1.08); }
-    .mnav-btn.active::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 4px 4px; background: #f59e0b; }
-    .mchip { flex-shrink: 0; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #475569; }
-    .mchip.on-all { background: #0f172a; color: #fff; border-color: #0f172a; }
-    .mchip.on-pending { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
-    .mchip.on-done { background: #059669; color: #fff; border-color: #059669; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased select-none">
 
   <!-- TOP APP BAR -->
-  <header id="appHeader" class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
       
       <!-- Brand & Date -->
       <div class="flex items-center space-x-2.5 min-w-0">
-        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-base sm:text-lg text-slate-950 shadow-md shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-lg text-slate-950 shadow-md shrink-0">
           ⚡
         </div>
         <div class="min-w-0">
           <h1 class="text-sm sm:text-base font-bold text-white truncate flex items-center gap-1.5">
             <span>Power Meter Fac.2</span>
-            <span class="hidden sm:inline text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
+            <span class="text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">v2.0</span>
           </h1>
           <p class="text-[11px] text-slate-400 truncate" id="currentDateDisplay">กำลังโหลดวันที่...</p>
         </div>
@@ -171,8 +147,8 @@
           <span id="percentText" class="text-[11px] font-semibold text-emerald-400">0%</span>
         </div>
 
-        <!-- View Switcher (มือถือใช้แถบเมนูด้านล่างแทน) -->
-        <div class="hidden sm:inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
+        <!-- View Switcher -->
+        <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
           <button id="btnMapView" onclick="switchView('map')" class="px-2.5 py-1 rounded-md font-medium bg-amber-500 text-slate-950 shadow transition-all">
             🗺️ ผัง
           </button>
@@ -185,18 +161,12 @@
         </div>
 
         <!-- Sheet Log Button -->
-        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="hidden sm:flex p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium items-center gap-1 shadow transition">
+        <button onclick="openTableModal()" title="ดูตารางประวัติ Google Sheets" class="p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1 shadow transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           <span class="hidden md:inline">ตารางชีท</span>
         </button>
       </div>
 
-    </div>
-    <!-- มือถือ: แถบความคืบหน้าวันนี้ -->
-    <div class="sm:hidden px-3 pb-2 -mt-0.5 flex items-center gap-2 text-[11px]">
-      <span class="text-slate-300 shrink-0">จดแล้ว <b id="mRecorded" class="text-amber-400">0</b>/<b id="mTotal">15</b> ตู้</span>
-      <div class="flex-1 bg-slate-700 rounded-full h-1.5 overflow-hidden"><div id="mProgressBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div></div>
-      <span id="mPercent" class="font-semibold text-emerald-400 shrink-0">0%</span>
     </div>
   </header>
 
@@ -207,21 +177,20 @@
     <div id="viewMap" class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
 
       <!-- TOOLBAR: Quick Filter & Guide Hint -->
-      <div class="px-2 sm:px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="hidden sm:flex items-center gap-1.5 text-slate-600">
+      <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-1.5 text-slate-600">
           <span class="font-bold text-slate-900">แผนผังโรงงาน:</span>
           <span class="text-slate-500 hidden sm:inline">ใช้นิ้วเลื่อน / จีบนิ้วเพื่อย่อ-ขยาย</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-semibold">⚠️ รอจด</span>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-900 font-semibold">✓ จดแล้ว</span>
         </div>
 
-        <div class="flex items-center gap-1.5 sm:gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
+        <div class="flex items-center gap-1">
           <button onclick="filterStatus('all')" id="fltAll" class="px-2 py-0.5 text-[11px] rounded font-semibold bg-slate-900 text-white">ทั้งหมด (15)</button>
           <button onclick="filterStatus('pending')" id="fltPending" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">รอจด (<span id="pendingBadgeCount">15</span>)</button>
           <button onclick="filterStatus('done')" id="fltDone" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">จดแล้ว (<span id="doneBadgeCount">0</span>)</button>
-          <button onclick="toggleRoute()" id="btnRoute" title="แนะนำลำดับการเดินจด" class="shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border border-indigo-300 text-indigo-700 bg-white">🧭 นำทาง</button>
           <button onclick="toggleLayoutEdit()" id="btnLayoutEdit" title="ลากจุดและกล่องชื่อบนแผนผัง" class="px-2 py-0.5 text-[11px] rounded font-medium border border-sky-300 text-sky-700">✏️ จัดตำแหน่ง</button>
-          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="hidden sm:inline-block text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
+          <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
         </div>
       </div>
 
@@ -235,7 +204,6 @@
 
           <!-- Leader lines (drawn by JS) -->
           <svg id="leaderLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807"></svg>
-          <svg id="routeLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807" style="z-index:5"></svg>
 
           <!-- Hotspots Layer -->
           <div id="hotspotLayer" class="absolute inset-0 pointer-events-auto"></div>
@@ -270,9 +238,6 @@
           <div id="layoutEditMsg" class="text-[11px] text-rose-600 font-semibold"></div>
         </div>
 
-        <!-- ROUTE PANEL (แนะนำเส้นทางเดินจด) -->
-        <div id="routePanel" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onwheel="event.stopPropagation()" class="hidden absolute bottom-3 left-2 right-2 sm:left-3 sm:right-auto sm:w-80 z-30 bg-white/95 backdrop-blur border-2 border-indigo-500 rounded-2xl shadow-2xl p-2.5 text-xs space-y-2"></div>
-
         <!-- Touch / Pinch Helper Badge for Mobile -->
         <div id="touchHelpHint" class="absolute bottom-3 left-3 z-20 pointer-events-none bg-slate-900/80 backdrop-blur-sm text-slate-300 text-[11px] px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg opacity-90 transition-opacity duration-500">
           <span>👆 ลากเพื่อเลื่อน / 🤏 จีบนิ้วย่อ-ขยาย</span>
@@ -282,7 +247,7 @@
 
       <!-- QUICK SELECTOR RIBBON (Swipable carousel at bottom of map for fast mobile selection) -->
       <div class="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1">
-        <div class="hidden sm:flex items-center justify-between text-[11px] text-slate-400 px-1">
+        <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
           <span class="font-semibold text-slate-300">⚡ เลือกจุดตรวจด่วน (แตะเพื่อโฟกัส):</span>
           <span class="text-[10px] text-slate-500">เลื่อนซ้าย-ขวาได้</span>
         </div>
@@ -295,8 +260,7 @@
 
     <!-- VIEW 2: LIST VIEW -->
     <div id="viewList" class="hidden space-y-3">
-      <div id="listChips" class="sm:hidden flex gap-1.5 overflow-x-auto no-scrollbar -mx-0.5 px-0.5"></div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="cardsContainer">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="cardsContainer">
         <!-- Rendered by JS -->
       </div>
     </div>
@@ -342,18 +306,54 @@
         </div>
       </div>
 
+      <!-- ปฏิทินช่วงวัน/ช่วงเดือน (ย้ายมาอยู่ใต้แถบเลือกช่วงเวลาด้านบน — ใช้ร่วมกันทั้งหน้า) -->
+      <div class="text-xs">
+        <!-- Calendar Inputs (Custom Date Range Picker) -->
+        <div id="chartCalendarDaysBox" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
+          <span class="font-bold text-slate-700 text-xs flex items-center gap-1">📅 ปฏิทินเลือกช่วงวัน:</span>
+          <div class="flex items-center gap-1">
+            <span class="text-slate-500 text-[11px]">จาก:</span>
+            <input type="date" id="calDateStart" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-slate-500 text-[11px]">ถึง:</span>
+            <input type="date" id="calDateEnd" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
+          </div>
+          <button type="button" onclick="applyCustomDateRange()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition active:scale-95 shadow-xs cursor-pointer">
+            ตกลง
+          </button>
+        </div>
+
+        <!-- Calendar Inputs (Custom Month-to-Month Range Picker) -->
+        <div id="chartCalendarMonthsBox" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
+          <span class="font-bold text-slate-700 text-xs flex items-center gap-1">📆 ปฏิทินเลือกช่วงเดือน:</span>
+          <div class="flex items-center gap-1">
+            <span class="text-slate-500 text-[11px]">จากเดือน:</span>
+            <input type="month" id="calMonthStart" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-slate-500 text-[11px]">ถึงเดือน:</span>
+            <input type="month" id="calMonthEnd" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
+          </div>
+          <button type="button" onclick="applyCustomMonthRange()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition active:scale-95 shadow-xs cursor-pointer">
+            ตกลง
+          </button>
+        </div>
+
+      </div>
+
       <!-- TOP SUMMARY KPI CARDS (2x2 on Mobile, 4-Cols on Desktop) -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         
         <!-- CARD 1: Unified Factory Total (รวมทุกหน่วยเป็นก้อนเดียวในองค์รวม) -->
         <div class="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-blue-500/40 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="kpi-head flex items-center justify-between mb-1">
+          <div class="flex items-center justify-between mb-1">
             <span id="dashCard1Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
               <span>⚡</span> รวมไฟทั้งโรงงาน
             </span>
-            <button type="button" onclick="toggleDashTotalMode()" id="btnDashTotalModeBadge" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 hover:bg-amber-400/30 transition cursor-pointer" title="แตะเพื่อสลับ: เฉพาะตู้ย่อย (ไม่นับซ้ำ) หรือ รวมตู้ Main">
-              ⚡ เฉพาะตู้ย่อย ⮂
-            </button>
+            <span id="btnDashTotalModeBadge" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" title="รวมเฉพาะตู้ย่อย — ไม่บวกตู้ Main ซ้ำ (ตู้ Main แสดงแยกบรรทัดล่าง)">
+              ⚡ เฉพาะตู้ย่อย
+            </span>
           </div>
           <div>
             <div id="dashTotalCombinedKwh" class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight">
@@ -367,7 +367,7 @@
 
         <!-- CARD 2: Top Peak Consumer (จุดที่ใช้อัตราไฟสูงสุด) -->
         <div class="bg-gradient-to-br from-purple-950/90 to-slate-900 border border-purple-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="kpi-head flex items-center justify-between mb-1">
+          <div class="flex items-center justify-between mb-1">
             <span id="dashCard2Title" class="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1">
               <span>🔥</span> จุดใช้ไฟสูงสุด
             </span>
@@ -387,7 +387,7 @@
 
         <!-- CARD 3: Progress & Completion -->
         <div class="bg-gradient-to-br from-emerald-950/90 to-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="kpi-head flex items-center justify-between mb-1">
+          <div class="flex items-center justify-between mb-1">
             <span id="dashCard3Title" class="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1">
               <span>✓</span> จดแล้ว
             </span>
@@ -408,7 +408,7 @@
 
         <!-- CARD 4: Pending & Inspector -->
         <div class="bg-gradient-to-br from-amber-950/90 to-slate-900 border border-amber-500/30 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
-          <div class="kpi-head flex items-center justify-between mb-1">
+          <div class="flex items-center justify-between mb-1">
             <span id="dashCard4Title" class="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
               <span>⚠️</span> รอจด
             </span>
@@ -436,28 +436,6 @@
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.07-.15.98-.6 2.86-.75 3.32-.2.62.24.61.5.44.35-.23 3.73-2.5 4.35-2.92.67.14 1.35.21 2.04.21 5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
           <span>📲 คัดลอกสรุปส่ง LINE รายวัน</span>
         </button>
-
-        <!-- Right: Filter Pill Selector for Dashboard Cards -->
-        <div class="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-          <button type="button" onclick="filterDashboard('all')" id="btnDashFltAll" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shrink-0 transition">
-            ทั้งหมด (15)
-          </button>
-          <button type="button" onclick="filterDashboard('subpanels')" id="btnDashFltSubpanels" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1">
-            <span>⚡ เฉพาะตู้ย่อย</span>
-          </button>
-          <button type="button" onclick="filterDashboard('mains')" id="btnDashFltMains" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1">
-            <span>🏢 ตู้ Main</span>
-          </button>
-          <button type="button" onclick="filterDashboard('top')" id="btnDashFltTop" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1">
-            <span>🔥 ใช้ไฟสูงสุด</span>
-          </button>
-          <button type="button" onclick="filterDashboard('done')" id="btnDashFltDone" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">
-            ✓ จดแล้ว
-          </button>
-          <button type="button" onclick="filterDashboard('pending')" id="btnDashFltPending" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">
-            ⚠️ รอจด
-          </button>
-        </div>
 
       </div>
 
@@ -519,75 +497,12 @@
           </div>
         </div>
 
-        <!-- Chart Controls: Time Period & Calendar Filter + Metric Type Selector -->
-        <div id="chartTimeFilterWrap" class="space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
-          <!-- Row 1: Time Period Selection Tabs -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5 shrink-0">
-              <span class="font-bold text-slate-700 flex items-center gap-1">
-                <span>🗓️</span> ช่วงเวลา:
-              </span>
-              <span id="chartActivePeriodText" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                วันนี้
-              </span>
-            </div>
-
-            <!-- Quick Presets -->
-            <div class="inline-flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] overflow-x-auto no-scrollbar">
-              <button type="button" onclick="setChartPeriod('today')" id="btnPeriodToday" class="px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white shadow-xs transition shrink-0">
-                วันนี้
-              </button>
-              <button type="button" onclick="setChartPeriod('last7')" id="btnPeriodLast7" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
-                7 วันล่าสุด
-              </button>
-              <button type="button" onclick="setChartPeriod('thisMonth')" id="btnPeriodThisMonth" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0">
-                เดือนนี้
-              </button>
-              <button type="button" onclick="setChartPeriod('customDays')" id="btnPeriodCustomDays" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 shrink-0">
-                <span>📅 ช่วงวัน</span>
-              </button>
-              <button type="button" onclick="setChartPeriod('customMonths')" id="btnPeriodCustomMonths" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 shrink-0">
-                <span>📆 ช่วงเดือน</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Calendar Inputs (Custom Date Range Picker) -->
-          <div id="chartCalendarDaysBox" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
-            <span class="font-bold text-slate-700 text-xs flex items-center gap-1">📅 ปฏิทินเลือกช่วงวัน:</span>
-            <div class="flex items-center gap-1">
-              <span class="text-slate-500 text-[11px]">จาก:</span>
-              <input type="date" id="calDateStart" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="text-slate-500 text-[11px]">ถึง:</span>
-              <input type="date" id="calDateEnd" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
-            </div>
-            <button type="button" onclick="applyCustomDateRange()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition active:scale-95 shadow-xs cursor-pointer">
-              ตกลง
-            </button>
-          </div>
-
-          <!-- Calendar Inputs (Custom Month-to-Month Range Picker) -->
-          <div id="chartCalendarMonthsBox" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
-            <span class="font-bold text-slate-700 text-xs flex items-center gap-1">📆 ปฏิทินเลือกช่วงเดือน:</span>
-            <div class="flex items-center gap-1">
-              <span class="text-slate-500 text-[11px]">จากเดือน:</span>
-              <input type="month" id="calMonthStart" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="text-slate-500 text-[11px]">ถึงเดือน:</span>
-              <input type="month" id="calMonthEnd" class="border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 bg-white outline-none focus:border-indigo-500">
-            </div>
-            <button type="button" onclick="applyCustomMonthRange()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition active:scale-95 shadow-xs cursor-pointer">
-              ตกลง
-            </button>
-          </div>
-
+        <!-- Chart Controls: Metric Type Selector (แสดงเฉพาะโหมด "แยกรายจุด" — เลขมิเตอร์หลายตู้บวกกันไม่มีความหมาย) -->
+        <div id="chartTimeFilterWrap" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
           <!-- Row 2: Metric Type Switcher (อัตราการใช้ไฟ vs ค่าเลขมิเตอร์ที่จด) -->
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
-              <span class="font-bold text-slate-700">ชนิดข้อมูลที่แสดง:</span>
+              <span class="font-bold text-slate-700">ชนิดข้อมูลที่แสดง (เฉพาะโหมดแยกรายจุด):</span>
             </div>
             <div class="inline-flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] overflow-x-auto no-scrollbar">
               <button type="button" onclick="setChartMetricType('diff')" id="btnMetricDiff" class="px-2.5 py-1 rounded-lg font-bold bg-amber-500 text-slate-950 shadow-xs transition shrink-0">
@@ -618,8 +533,8 @@
               <button type="button" onclick="setChartPreset('mains')" id="btnPresetMains" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0 cursor-pointer">
                 🏢 จุดหลัก (เฉพาะ Main)
               </button>
-              <button type="button" onclick="setChartPreset('all')" id="btnPresetAll" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0 cursor-pointer">
-                แสดงครบ 15 จุด
+              <button type="button" onclick="setChartPreset('all')" id="btnPresetAll" title="ตู้ Main กับตู้ย่อยแสดงแยกกัน ไม่นำมาบวกรวม" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition shrink-0 cursor-pointer">
+                🌐 ทั้งหมด (แยก ย่อย / Main)
               </button>
               <button type="button" onclick="toggleCustomMetersDrawer()" id="btnToggleCustomMeters" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 shrink-0 cursor-pointer">
                 <span>⚙️ เลือกจุดเอง</span>
@@ -676,7 +591,7 @@
       <div class="space-y-2">
         <div class="flex items-center justify-between px-1">
           <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <span>📊</span> รายการแต่ละจุดและพลังงานที่ใช้
+            <span>📊</span> <span id="dashBreakdownTitle">อันดับการใช้ไฟแต่ละจุด</span>
           </span>
           <span id="dashItemsCountText" class="text-[11px] text-slate-500 font-medium">15 จุด</span>
         </div>
@@ -690,21 +605,10 @@
 
   </main>
 
-  <!-- การ์ด "ตู้ถัดไป" หลังบันทึก -->
-  <div id="nextCard" class="hidden fixed left-2 right-2 sm:left-auto sm:right-4 sm:w-80 z-[45] top-[calc(var(--hdrH,76px)+8px)] sm:top-auto sm:bottom-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-indigo-400 p-3 text-xs"></div>
-
-  <!-- มือถือ: เมนูด้านล่างแบบแอป -->
-  <nav id="mobileNav" class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex">
-    <button type="button" data-v="map" onclick="switchView('map')" class="mnav-btn active"><span class="ico">🗺️</span>ผัง</button>
-    <button type="button" data-v="list" onclick="switchView('list')" class="mnav-btn"><span class="ico">📋</span>รายการจด</button>
-    <button type="button" data-v="dashboard" onclick="switchView('dashboard')" class="mnav-btn"><span class="ico">📊</span>สรุป</button>
-    <button type="button" onclick="openTableModal()" class="mnav-btn"><span class="ico">📄</span>ตาราง</button>
-  </nav>
-
   <!-- MODAL / BOTTOM SHEET: DATA RECORDING FORM -->
     <!-- EDIT METER INFO MODAL -->
   <div id="meterInfoModal" class="fixed inset-0 z-[60] flex items-center justify-center p-3 bg-slate-950/70 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs max-h-[92vh] overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 space-y-2.5 text-xs">
       <div class="flex items-center justify-between">
         <div class="font-bold text-slate-900 text-sm">✏️ แก้ไขข้อมูลตู้ <span id="miId" class="font-mono text-slate-500"></span></div>
         <button type="button" onclick="closeMeterInfoEditor()" class="text-slate-400 hover:text-slate-700 text-lg px-2">✕</button>
@@ -713,14 +617,7 @@
       <label class="block">ชื่อตู้ <input id="miName" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ป้ายสั้น (บนหมุด/ปุ่มลัด) <input id="miLabel" maxlength="12" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <label class="block">ประเภทตู้ <input id="miType" maxlength="60" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
-      <div id="miMachinesBox" class="rounded-xl border border-sky-200 bg-sky-50/50 p-2 space-y-1.5">
-        <div class="flex items-center justify-between">
-          <span class="font-bold text-slate-800">🏭 เครื่องจักรที่ใช้ตู้นี้ <span id="miMachineCount" class="text-slate-400 font-normal"></span></span>
-          <button type="button" onclick="addMachineRow('')" class="px-2 py-1 rounded-lg bg-sky-600 text-white font-bold">+ เพิ่ม</button>
-        </div>
-        <div id="miMachines" class="space-y-1.5"></div>
-        <div class="text-[10px] text-slate-500">พิมพ์ชื่อเครื่องจักร 1 ช่องต่อ 1 เครื่อง • กด 🗑 เพื่อลบ • ช่องที่เว้นว่างจะไม่ถูกบันทึก</div>
-      </div>
+      <label class="block">อุปกรณ์ควบคุม <textarea id="miLoads" rows="2" maxlength="200" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></textarea></label>
       <label class="block">รหัสผ่านผู้ดูแล <input id="miPin" type="password" inputmode="numeric" class="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></label>
       <div class="flex gap-2 pt-1">
         <button type="button" onclick="submitMeterInfo()" class="flex-1 px-3 py-2 rounded-lg bg-sky-600 text-white font-bold">💾 บันทึก</button>
@@ -796,12 +693,9 @@
             <span class="text-slate-500 font-medium">ประเภทตู้:</span>
             <span id="modalCabinetType" class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">Power Panel</span>
           </div>
-          <div class="pt-1.5 border-t border-slate-200">
-            <div class="flex justify-between items-center gap-2 mb-1">
-              <span class="text-slate-500 font-medium">🏭 ตู้นี้จ่ายไฟให้เครื่องจักร:</span>
-              <button type="button" onclick="openMeterInfoEditor(true)" class="text-sky-700 font-bold underline underline-offset-2 shrink-0">✏️ แก้ไข/เพิ่ม/ลบ</button>
-            </div>
-            <div id="modalLoads" class="flex flex-wrap gap-1"></div>
+          <div class="flex justify-between items-start gap-2">
+            <span class="text-slate-500 font-medium shrink-0">อุปกรณ์ควบคุม:</span>
+            <span id="modalLoads" class="font-semibold text-slate-800 text-right">Plotter RB, Shuttering RB</span>
           </div>
         </div>
 
@@ -1505,131 +1399,9 @@
 
       if (layoutEditMode) attachLayoutDrag();
       drawLeaderLines();
-      try { drawRoute(); } catch (e) { console.warn(e); }
       renderQuickSelector();
       updateStats();
     }
-
-    // ----------------------------------------------------
-    // ROUTE GUIDE: แนะนำลำดับเดินจด (ตามระยะบนแผนผัง — เส้นตรง ไม่ได้คิดกำแพง/ทางเดิน)
-    // ----------------------------------------------------
-    let routeOn = false, routeStartId = '';
-    try { routeOn = localStorage.getItem('pm_route_on') === '1'; routeStartId = localStorage.getItem('pm_route_start') || ''; } catch (e) {}
-    const ptOf = m => ({ x: m.planX / 100 * BASE_WIDTH, y: m.planY / 100 * BASE_HEIGHT });
-    const distM = (a, b) => { const p = ptOf(a), q = ptOf(b); return Math.hypot(p.x - q.x, p.y - q.y); };
-    const tagOf = m => (m.label ? m.label + ' ' : '') + m.name;
-    // ตู้ที่ยังไม่จด เรียงตามระยะเดินสั้นที่สุด (ใกล้สุดก่อน + ปรับสลับลำดับ 2-opt) เริ่มจาก startId
-    function planRoute(startId) {
-      const pending = METERS.filter(m => !recordsData[m.id]);
-      const start = METERS.find(m => m.id === startId);
-      if (!pending.length) return { start, order: [] };
-      const pool = pending.filter(m => !start || m.id !== start.id);
-      const path = start ? [start] : [pool.shift()];
-      while (pool.length) {
-        const cur = path[path.length - 1];
-        let bi = 0, bd = Infinity;
-        pool.forEach((m, i) => { const d = distM(cur, m); if (d < bd) { bd = d; bi = i; } });
-        path.push(pool.splice(bi, 1)[0]);
-      }
-      // 2-opt: สลับช่วงลำดับถ้าทำให้ระยะรวมสั้นลง (จุดเริ่มคงที่ เส้นทางไม่ต้องวนกลับ)
-      let improved = true, guard = 0;
-      while (improved && guard++ < 60) {
-        improved = false;
-        for (let i = 1; i < path.length - 1; i++) for (let k = i + 1; k < path.length; k++) {
-          const a = path[i - 1], b = path[i], c = path[k], d = path[k + 1];
-          const before = distM(a, b) + (d ? distM(c, d) : 0), after = distM(a, c) + (d ? distM(b, d) : 0);
-          if (after + 0.01 < before) { path.splice(i, k - i + 1, ...path.slice(i, k + 1).reverse()); improved = true; }
-        }
-      }
-      return { start, order: path.filter(m => !recordsData[m.id]) };
-    }
-    function defaultRouteStart() {
-      if (routeStartId && METERS.some(m => m.id === routeStartId)) return routeStartId;
-      const done = Object.values(recordsData).filter(r => r && r.timestamp).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
-      if (done.length && METERS.some(m => m.id === done[0].meterId)) return done[0].meterId;
-      const p = METERS.filter(m => !recordsData[m.id]);
-      return (p[0] || METERS[0] || {}).id || '';
-    }
-    function toggleRoute(force) {
-      routeOn = typeof force === 'boolean' ? force : !routeOn;
-      try { localStorage.setItem('pm_route_on', routeOn ? '1' : '0'); } catch (e) {}
-      if (routeOn && typeof switchView === 'function' && document.getElementById('viewMap').classList.contains('hidden')) switchView('map');
-      drawRoute(); renderCards();
-    }
-    function setRouteStart(id) {
-      routeStartId = id; try { localStorage.setItem('pm_route_start', id); } catch (e) {}
-      drawRoute(); renderCards();
-    }
-    function drawRoute() {
-      const svg = document.getElementById('routeLayer'), panel = document.getElementById('routePanel'), btn = document.getElementById('btnRoute');
-      if (!svg || !panel) return;
-      if (btn) btn.className = 'shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border ' + (routeOn ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-300 text-indigo-700 bg-white');
-      if (!routeOn) { svg.innerHTML = ''; panel.classList.add('hidden'); const h = document.getElementById('touchHelpHint'); if (h) h.classList.remove('hidden'); return; }
-      const h = document.getElementById('touchHelpHint'); if (h) h.classList.add('hidden');
-      const sid = defaultRouteStart();
-      const { start, order } = planRoute(sid);
-      const pts = (start && recordsData[start.id] ? [start] : []).concat(order).map(ptOf);
-      let out = '';
-      if (pts.length > 1) {
-        out += `<polyline points="${pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}" fill="none" stroke="#4f46e5" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`;
-        for (let i = 1; i < pts.length; i++) { // ลูกศรกลางเส้น
-          const a = pts[i - 1], b = pts[i], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-          out += `<path d="M-6,-5 L6,0 L-6,5 Z" fill="#4f46e5" transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`;
-        }
-      }
-      order.forEach((m, i) => { const p = ptOf(m);
-        out += `<g transform="translate(${(p.x + 13).toFixed(1)},${(p.y - 13).toFixed(1)})"><circle r="9" fill="${i === 0 ? '#4f46e5' : '#ffffff'}" stroke="#4f46e5" stroke-width="2"/><text text-anchor="middle" dy="3.5" font-size="10" font-weight="800" fill="${i === 0 ? '#fff' : '#4f46e5'}">${i + 1}</text></g>`;
-        if (i === 0) out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="20" fill="none" stroke="#4f46e5" stroke-width="3"><animate attributeName="r" values="14;26;14" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>`;
-      });
-      svg.innerHTML = out;
-      const opts = METERS.slice().sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true }))
-        .map(m => `<option value="${m.id}" ${m.id === sid ? 'selected' : ''}>${escHtml(tagOf(m))}${recordsData[m.id] ? ' ✓' : ''}</option>`).join('');
-      const next = order[0];
-      panel.innerHTML = `
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-bold text-indigo-800">🧭 แนะนำเส้นทางเดินจด</span>
-          <button type="button" onclick="toggleRoute(false)" class="text-slate-400 hover:text-slate-700 px-1 text-base leading-none">✕</button>
-        </div>
-        <label class="flex items-center gap-1.5"><span class="text-slate-500 shrink-0">เริ่มจาก</span>
-          <select onchange="setRouteStart(this.value)" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-1.5 py-1 bg-white text-xs">${opts}</select></label>
-        ${next ? `
-        <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-2 py-1.5">
-          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0">1</span>
-          <div class="min-w-0 flex-1"><div class="text-[10px] text-indigo-600 font-semibold">ไปจดตู้นี้ก่อน</div><div class="font-bold text-slate-900 truncate">${escHtml(tagOf(next))}</div></div>
-          <button type="button" onclick="focusMeter('${next.id}')" class="px-2 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-700 font-bold shrink-0">📍</button>
-          <button type="button" onclick="openRecordModal('${next.id}')" class="px-2 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold shrink-0">📝 จด</button>
-        </div>
-        <div class="text-[11px] text-slate-600 leading-snug">ลำดับต่อไป: ${order.slice(1, 6).map((m, i) => `<b>${i + 2}.</b> ${escHtml(m.label || m.name)}`).join(' → ') || '-'}${order.length > 6 ? ' → …' : ''}</div>
-        <div class="text-[10px] text-slate-400">เหลือ ${order.length} ตู้ • คิดจากระยะเส้นตรงบนแผนผัง (ไม่ได้คิดกำแพง/ทางเดิน)</div>`
-        : '<div class="text-emerald-700 font-bold py-1">✓ จดครบทุกตู้แล้ววันนี้</div>'}`;
-      panel.classList.remove('hidden');
-    }
-    // หลังบันทึก: แนะนำตู้ถัดไปที่ใกล้ที่สุด
-    function showNextSuggestion(fromId) {
-      const card = document.getElementById('nextCard'); if (!card) return;
-      if (routeOn) { routeStartId = fromId; try { localStorage.setItem('pm_route_start', fromId); } catch (e) {} drawRoute(); }
-      const { order } = planRoute(fromId);
-      const from = METERS.find(m => m.id === fromId);
-      if (!order.length) {
-        card.innerHTML = '<div class="flex items-center justify-between gap-2"><span class="font-bold text-emerald-300">🎉 จดครบทุกตู้แล้ววันนี้</span><button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base">✕</button></div>';
-      } else {
-        const n = order[0];
-        card.innerHTML = `
-          <div class="flex items-center justify-between gap-2 mb-1.5">
-            <span class="text-indigo-300 font-semibold">🧭 ตู้ถัดไปที่ใกล้ที่สุด${from ? ' (จาก ' + escHtml(from.label || from.name) + ')' : ''}</span>
-            <button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base leading-none">✕</button>
-          </div>
-          <div class="flex items-center gap-2">
-            <div class="min-w-0 flex-1"><div class="font-black text-base truncate">${escHtml(tagOf(n))}</div>
-              <div class="text-[10px] text-slate-400">เหลืออีก ${order.length} ตู้${order[1] ? ' • ต่อจากนั้น: ' + escHtml(order[1].label || order[1].name) : ''}</div></div>
-            <button type="button" onclick="hideNextCard(); switchView('map'); setTimeout(() => focusMeter('${n.id}'), 120)" class="px-2.5 py-2 rounded-xl bg-slate-700 font-bold shrink-0">📍</button>
-            <button type="button" onclick="hideNextCard(); openRecordModal('${n.id}')" class="px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold shrink-0">📝 จดต่อ</button>
-          </div>`;
-      }
-      card.classList.remove('hidden');
-      clearTimeout(window.__nextCardT); window.__nextCardT = setTimeout(hideNextCard, 20000);
-    }
-    function hideNextCard() { const c = document.getElementById('nextCard'); if (c) c.classList.add('hidden'); }
 
     // Leader lines: from the edge of each callout box to its pin (SVG, redrawn on every move)
     function drawLeaderLines() {
@@ -1761,43 +1533,15 @@
     // ----------------------------------------------------
     // EDIT METER INFO (name / label / type / loads) -> saved to sheet Meters (+ history names in Daily_Logs)
     // ----------------------------------------------------
-    // รายชื่อเครื่องจักรเก็บในคอลัมน์ Loads_Description เดิม คั่นด้วย " | "
-    function parseMachines(s) { return String(s || '').split(/\s*[|\n]\s*/).map(x => x.trim()).filter(Boolean); }
-    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-    function renderModalMachines(meter) {
-      const el = document.getElementById('modalLoads'); if (!el) return;
-      const list = parseMachines(meter && meter.loads);
-      el.innerHTML = list.length
-        ? list.map(m => `<span class="px-2 py-1 rounded-lg bg-white border border-slate-200 font-semibold text-slate-800">⚙️ ${escHtml(m)}</span>`).join('')
-        : '<span class="text-slate-400 italic">ยังไม่ได้ระบุ — กด "แก้ไข/เพิ่ม/ลบ" เพื่อใส่ชื่อเครื่องจักร</span>';
-    }
-    function updateMachineCount() {
-      const n = Array.from(document.querySelectorAll('#miMachines input')).filter(i => i.value.trim()).length;
-      document.getElementById('miMachineCount').innerText = '(' + n + ' เครื่อง)';
-    }
-    function addMachineRow(val, focus = true) {
-      const box = document.getElementById('miMachines');
-      const row = document.createElement('div');
-      row.className = 'flex gap-1.5';
-      row.innerHTML = `<input maxlength="80" placeholder="เช่น เครื่องผสมปูน, ปั๊มน้ำ" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-        <button type="button" title="ลบเครื่องนี้" class="shrink-0 w-9 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 font-bold">🗑</button>`;
-      const inp = row.querySelector('input'); inp.value = val; inp.oninput = updateMachineCount;
-      row.querySelector('button').onclick = () => { row.remove(); updateMachineCount(); };
-      box.appendChild(row); updateMachineCount();
-      if (focus) inp.focus();
-    }
-    function openMeterInfoEditor(machinesFirst) {
+    function openMeterInfoEditor() {
       if (!activeMeter) return;
       document.getElementById('miId').innerText = activeMeter.id;
       document.getElementById('miName').value = activeMeter.name || '';
       document.getElementById('miLabel').value = activeMeter.label || '';
       document.getElementById('miType').value = activeMeter.type || '';
-      const box = document.getElementById('miMachines'); box.innerHTML = '';
-      const list = parseMachines(activeMeter.loads);
-      (list.length ? list : ['']).forEach(m => addMachineRow(m, false));
+      document.getElementById('miLoads').value = activeMeter.loads || '';
       document.getElementById('miMsg').innerText = '';
       document.getElementById('meterInfoModal').classList.remove('hidden');
-      if (machinesFirst) { const b = document.getElementById('miMachinesBox'); if (b) b.scrollIntoView({ block: 'center' }); }
     }
 
     function closeMeterInfoEditor() {
@@ -1812,7 +1556,7 @@
         name: document.getElementById('miName').value.trim(),
         label: document.getElementById('miLabel').value.trim(),
         type: document.getElementById('miType').value.trim(),
-        loads: Array.from(document.querySelectorAll('#miMachines input')).map(i => i.value.replace(/[|\n]/g, ' ').trim()).filter(Boolean).join(' | '),
+        loads: document.getElementById('miLoads').value.trim(),
         pin: document.getElementById('miPin').value.trim()
       };
       if (!payload.name) { msg.innerText = 'กรุณาใส่ชื่อตู้'; return; }
@@ -1828,7 +1572,7 @@
           activeMeter.loads = payload.loads;
           document.getElementById('modalMeterId').innerText = activeMeter.name;
           document.getElementById('modalCabinetType').innerText = activeMeter.type;
-          renderModalMachines(activeMeter);
+          document.getElementById('modalLoads').innerText = activeMeter.loads;
           closeMeterInfoEditor();
           renderHotspots(); renderCards(); renderDashboard();
           showToast('✓ อัปเดตข้อมูลตู้แล้ว' + (res.updatedRows ? ' (เปลี่ยนชื่อย้อนหลัง ' + res.updatedRows + ' แถว)' : ''));
@@ -1881,13 +1625,13 @@
         const kwhLine = `<div class="text-[9px] text-slate-500">${kwh > 0 ? Math.round(kwh).toLocaleString() + ' kWh' : '-'}</div>`;
         if (!w.isSet) {
           missing++;
-          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
+          rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border border-dashed border-amber-400 bg-amber-50/60 px-1.5 py-1 ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400">
             ${head}<div class="text-[10px] font-bold text-amber-600">+ ใส่เวลา</div><div class="text-[10px] text-slate-400">ยังไม่บันทึก</div>${kwhLine}</button>`;
           continue;
         }
         const off = w.type === 'หยุด';
         const per = (w.hours > 0 && kwh > 0) ? (kwh / w.hours) : null;
-        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="min-w-[86px] shrink-0 snap-end sm:min-w-0 text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
+        rows += `<button type="button" onclick="openWorkDayEditor('${d}')" class="text-left rounded-lg border px-1.5 py-1 ${off ? 'bg-slate-100 border-slate-200' : (w.type === 'OT' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200')} ${d === today ? 'ring-2 ring-indigo-400' : ''} hover:border-indigo-400" title="${w.note || ''}">
           ${head}
           <div class="text-[10px] ${off ? 'text-slate-500' : 'text-indigo-700 font-semibold'}">${off ? 'หยุด' : (w.start + '–' + w.end)}${w.type === 'OT' ? ' OT' : ''}</div>
           <div class="text-[10px] text-slate-600">${w.hours} ชม.</div>
@@ -1906,15 +1650,14 @@
               <div class="text-[10px] text-slate-500">แตะการ์ดวันเพื่อใส่/แก้เวลา • ใช้ ◀ ดูย้อนหลัง${missing ? ' • <b class="text-amber-600">ยังไม่บันทึก ' + missing + ' วัน</b>' : ''}${ti.note ? ' • ' + ti.note : ''}</div>
             </div>
           </div>
-          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ <span class="hidden sm:inline">บันทึก</span>เวลาทำงาน</button>
+          <button type="button" onclick="openWorkDayEditor('${today}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shrink-0">✏️ บันทึกเวลาทำงาน</button>
         </div>
         <div class="flex items-center justify-between mb-1 text-[11px]">
           <button type="button" onclick="shiftWorkStrip(-1)" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold">◀ ย้อนหลัง</button>
           <span class="font-semibold text-slate-600">${rangeTxt}</span>
           <button type="button" onclick="shiftWorkStrip(1)" ${workStripOffset >= 0 ? 'disabled' : ''} class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 font-bold disabled:opacity-30">ถัดไป ▶</button>
         </div>
-        <div id="workStripRow" class="flex gap-1.5 overflow-x-auto no-scrollbar snap-x sm:grid sm:grid-cols-7 sm:gap-1">${rows}</div>`;
-      const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth;
+        <div class="grid grid-cols-7 gap-1">${rows}</div>`;
     }
 
     function openWorkDayEditor(dStr) {
@@ -2014,53 +1757,9 @@
 
     // Render Cards in List View
     let currentFilter = 'all';
-    const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
-    function renderListChips() {
-      const el = document.getElementById('listChips'); if (!el) return;
-      const done = METERS.filter(m => !!recordsData[m.id]).length, all = METERS.length;
-      const routeChip = `<button type="button" onclick="toggleRoute()" class="mchip" style="${routeOn ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : 'color:#4338ca;border-color:#a5b4fc'}">🧭 เรียงตามเส้นทาง</button>`;
-      const chip = (k, txt) => `<button type="button" onclick="filterStatus('${k}')" class="mchip ${currentFilter === k ? 'on-' + k : ''}">${txt}</button>`;
-      el.innerHTML = chip('all', 'ทั้งหมด ' + all) + chip('pending', '⚠️ รอจด ' + (all - done)) + chip('done', '✓ จดแล้ว ' + done) + routeChip;
-    }
     function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
-      renderListChips();
-      if (isPhone()) {
-        let listOrder = METERS, stepOf = {};
-        if (routeOn) {
-          const r = planRoute(defaultRouteStart());
-          r.order.forEach((m, i) => stepOf[m.id] = i + 1);
-          listOrder = r.order.concat(METERS.filter(m => !stepOf[m.id]));
-        }
-        listOrder.forEach(meter => {
-          const rec = recordsData[meter.id], ok = !!rec;
-          if (currentFilter === 'pending' && ok) return;
-          if (currentFilter === 'done' && !ok) return;
-          const unit = rec ? (rec.unit || 'kWh') : 'kWh';
-          const fmt = v => Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 6 });
-          const sub = ok
-            ? `<span class="text-emerald-700 font-semibold">${fmt(rec.currentReading)} ${unit}</span> <span class="text-emerald-600">(${Number(rec.diff) >= 0 ? '+' : ''}${fmt(rec.diff)})</span>`
-            : `ครั้งก่อน <span class="font-mono text-slate-700">${fmt(meter.defaultPrev)}</span> ${unit}`;
-          const row = document.createElement('button');
-          row.type = 'button';
-          row.onclick = () => openRecordModal(meter.id);
-          row.className = `w-full text-left bg-white rounded-2xl border px-3 py-2.5 flex items-center gap-3 active:scale-[.98] transition ${ok ? 'border-emerald-200' : 'border-slate-200'}`;
-          row.innerHTML = `
-            <div class="w-11 h-11 rounded-xl shrink-0 flex flex-col items-center justify-center font-black leading-none ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-              <span class="text-[9px] font-bold opacity-70">${(meter.label || '').replace(/[0-9.]+$/, '') || 'ตู้'}</span>
-              <span class="text-sm">${(meter.label || '').match(/[0-9]+/) ? meter.label.match(/[0-9]+/)[0] : ok ? '✓' : '!'}</span>
-            </div>
-            <div class="min-w-0 flex-1">
-              <div class="font-bold text-slate-900 text-[15px] truncate">${stepOf[meter.id] ? `<span class="inline-flex w-5 h-5 mr-1 rounded-full ${stepOf[meter.id] === 1 ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-300'} text-[11px] font-black items-center justify-center align-middle">${stepOf[meter.id]}</span>` : ''}${meter.name}</div>
-              <div class="text-[12px] text-slate-500 truncate">${sub}</div>
-            </div>
-            <span class="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-500 text-slate-950'}">${ok ? '✓ แก้ไข' : '📝 จด'}</span>`;
-          container.appendChild(row);
-        });
-        if (!container.children.length) container.innerHTML = '<div class="text-center text-sm text-slate-400 py-10">ไม่มีรายการ</div>';
-        return;
-      }
 
       METERS.forEach(meter => {
         const isRecorded = !!recordsData[meter.id];
@@ -2162,8 +1861,6 @@
       btnList.className = inactiveClass;
       if (btnDash) btnDash.className = inactiveClass;
 
-      document.querySelectorAll('#mobileNav [data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === view));
-      window.scrollTo(0, 0);
       if (view === 'map') {
         viewMap.classList.remove('hidden');
         btnMap.className = activeClass;
@@ -2176,7 +1873,6 @@
         if (viewDashboard) viewDashboard.classList.remove('hidden');
         if (btnDash) btnDash.className = activeClass;
         renderDashboard();
-        requestAnimationFrame(() => { const wr = document.getElementById('workStripRow'); if (wr) wr.scrollLeft = wr.scrollWidth; });
       }
     }
 
@@ -2190,7 +1886,6 @@
       document.getElementById('totalCount').innerText = total;
       document.getElementById('progressBar').style.width = percent + '%';
       document.getElementById('percentText').innerText = percent + '%';
-      const mR = document.getElementById('mRecorded'); if (mR) { mR.innerText = recorded; document.getElementById('mTotal').innerText = total; document.getElementById('mPercent').innerText = percent + '%'; document.getElementById('mProgressBar').style.width = percent + '%'; }
 
       document.getElementById('pendingBadgeCount').innerText = pending;
       document.getElementById('doneBadgeCount').innerText = recorded;
@@ -2201,8 +1896,6 @@
     // ----------------------------------------------------
     // MOBILE DASHBOARD & PERIOD FILTER ENGINE (SHARED STATE)
     // ----------------------------------------------------
-    let dashFilter = 'all';
-    let dashTotalMode = localStorage.getItem('dash_total_mode') || 'subpanels';
     let chartMetricType = 'diff'; // 'diff' = อัตราการใช้ไฟ, 'reading' = ค่าเลขมิเตอร์ที่จดมา
     let chartPeriodMode = 'today'; // 'today', 'last7', 'thisMonth', 'customDays', 'customMonths' (เริ่มต้นที่ 'today' ให้ตรงกับรอบจดประจำวัน)
     let chartStartDate = '';
@@ -2400,33 +2093,41 @@
       return out;
     }
 
-function toggleDashTotalMode() {
-      dashTotalMode = (dashTotalMode === 'subpanels') ? 'all' : 'subpanels';
-      localStorage.setItem('dash_total_mode', dashTotalMode);
-      renderDashboard();
+    // ---- พลังงานของแต่ละตู้ในช่วงที่เลือก (ใช้ร่วมกันทั้งการ์ด KPI, รายการอันดับ และกราฟเทียบ 15 จุด) ----
+    // วันนี้ = ค่ารอบจดล่าสุด ปรับเป็นต่อ 24 ชม. | ช่วงเวลา = ผลรวม kWh รายวัน (แบ่งตามชั่วโมงจริง) ในช่วงนั้น
+    function meterEnergyForActivePeriod(m) {
+      const rec = recordsData[m.id];
+      if (chartPeriodMode === 'today') {
+        if (!rec) return { kwh: 0, hasData: false, real: 0, diff: 0, unit: m.defaultUnit || 'kWh', reading: Number(m.defaultPrev || 0), today: true };
+        const diff = Number(rec.diff || 0), unit = rec.unit || 'kWh';
+        const kwh = diff > 0 ? per24Kwh(m.id, toKwh(diff, unit)) : 0;
+        return { kwh: kwh, hasData: true, real: 1, diff: diff, unit: unit, reading: Number(rec.currentReading || 0), today: true };
+      }
+      const pts = getAllPointsForMeter(m.id).filter(p => isDateInFilter(p.date));
+      if (!pts.length) return { kwh: 0, hasData: false, real: 0, diff: 0, unit: m.defaultUnit || 'kWh', reading: Number((rec && rec.currentReading) || m.defaultPrev || 0) };
+      let kwh = 0, diff = 0, real = 0;
+      const byDate = {};
+      pts.forEach(p => { const k = Number(p.kwhEq || 0); if (k > 0) { kwh += k; byDate[p.date] = (byDate[p.date] || 0) + k; } diff += Number(p.diff || 0); if (!p.filler) real++; });
+      const last = pts[pts.length - 1];
+      return { kwh: kwh, hasData: true, real: real, diff: diff, unit: last.unit || 'kWh', reading: Number(last.reading || 0), energyDates: pts.map(p => p.date), byDate: byDate };
     }
 
-    function filterDashboard(filter) {
-      dashFilter = filter;
-      const btnAll = document.getElementById('btnDashFltAll');
-      const btnSub = document.getElementById('btnDashFltSubpanels');
-      const btnMain = document.getElementById('btnDashFltMains');
-      const btnTop = document.getElementById('btnDashFltTop');
-      const btnDone = document.getElementById('btnDashFltDone');
-      const btnPending = document.getElementById('btnDashFltPending');
-
-      const activeBtn = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shrink-0 transition shadow-sm';
-      const inactiveBtn = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition';
-
-      if (btnAll) btnAll.className = filter === 'all' ? activeBtn : inactiveBtn;
-      if (btnSub) btnSub.className = filter === 'subpanels' ? activeBtn : inactiveBtn;
-      if (btnMain) btnMain.className = filter === 'mains' ? activeBtn : inactiveBtn;
-      if (btnTop) btnTop.className = filter === 'top' ? activeBtn : inactiveBtn;
-      if (btnDone) btnDone.className = filter === 'done' ? activeBtn : inactiveBtn;
-      if (btnPending) btnPending.className = filter === 'pending' ? activeBtn : inactiveBtn;
-
-      renderDashboard();
+    // ช่วงวันที่จริงของตัวกรอง (ตัดไม่ให้เกินวันนี้)
+    function getActiveRange() {
+      const today = getFormatDateStr(new Date());
+      let s, e;
+      if (chartPeriodMode === 'customMonths' && chartStartMonth && chartEndMonth) {
+        s = chartStartMonth + '-01';
+        const p = chartEndMonth.split('-').map(Number);
+        e = getFormatDateStr(new Date(p[0], p[1], 0));
+      } else { s = chartStartDate; e = chartEndDate; }
+      if (!s || !e) { s = today; e = today; }
+      if (e > today) e = today;
+      if (s > e) s = e;
+      return { start: s, end: e };
     }
+    function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000) + 1; }
+    function fmtKwh(v, d = 1) { return Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: d }); }
 
     function renderDashboard() {
       try { renderWorkStrip(); } catch (e) { console.warn(e); }
@@ -2436,164 +2137,60 @@ function toggleDashTotalMode() {
       const pendingCount = total - recordedCount;
       const percent = Math.round((recordedCount / total) * 100);
       const periodLabel = getActivePeriodLabel();
-
-      let totalCombinedKwh = 0;
-      let topConsumer = null;
-      let topKwhEq = 0;
-      let lastTimestamp = "";
-
       const isToday = (chartPeriodMode === 'today');
-      let uniqueDates = new Set();
-      let energyDates = new Set();
-      let totalLogsInPeriod = 0;
 
-      if (isToday) {
-        // โหมดวันนี้: คำนวณจาก recordsData ของวันนี้
-        recordedKeys.forEach(k => {
-          const rec = recordsData[k];
-          const m = METERS.find(x => x.id === k);
-          const isMain = m && !!m.isMain;
+      // พลังงานรายตู้ (ชุดเดียว ใช้ทั้งหน้า)
+      const energy = {};
+      let subTotal = 0, mainTotal = 0, topConsumer = null, lastTimestamp = '';
+      const energyDates = new Set();
+      const subByDate = {};
+      let realLogs = 0;
+      METERS.forEach(m => {
+        const e = energy[m.id] = meterEnergyForActivePeriod(m);
+        if (m.isMain) mainTotal += e.kwh; else subTotal += e.kwh;
+        if (!m.isMain && e.kwh > 0 && (!topConsumer || e.kwh > topConsumer.kwh)) topConsumer = { id: m.id, label: m.label, name: m.name, kwh: e.kwh, diff: e.diff, unit: e.unit };
+        if (!m.isMain) { (e.energyDates || []).forEach(d => energyDates.add(d)); Object.keys(e.byDate || {}).forEach(d => { subByDate[d] = (subByDate[d] || 0) + e.byDate[d]; }); }
+        realLogs += e.real || 0;
+        const rec = recordsData[m.id];
+        if (rec && rec.timestamp) lastTimestamp = rec.timestamp;
+      });
 
-          const diff = Number(rec.diff || 0);
-          const unit = String(rec.unit || 'kWh').toUpperCase();
-          const kwhRaw = (unit === 'MWH') ? (diff * 1000) : diff;
-          const kwhEq = per24Kwh(k, kwhRaw); // ปรับเป็นต่อ 24 ชม. ตามชั่วโมงจริงของรอบนี้
-
-          if (dashTotalMode === 'subpanels') {
-            // รวมเฉพาะตู้ย่อย/โหลด (ตัดตู้ Main ออก เพื่อไม่ให้นับซ้ำซ้อน)
-            if (!isMain && diff > 0) totalCombinedKwh += kwhEq;
-            if (!isMain && kwhEq > topKwhEq) {
-              topKwhEq = kwhEq;
-              topConsumer = {
-                id: k,
-                label: m ? m.label : k,
-                name: m ? m.name : k,
-                diff: diff,
-                unit: rec.unit || 'kWh',
-                kwhEq: kwhEq
-              };
-            }
-          } else {
-            // รวมทุกจุด (รวมตู้ Main MDB/EMDB/HV)
-            if (diff > 0) totalCombinedKwh += kwhEq;
-            if (kwhEq > topKwhEq) {
-              topKwhEq = kwhEq;
-              topConsumer = {
-                id: k,
-                label: m ? m.label : k,
-                name: m ? m.name : k,
-                diff: diff,
-                unit: rec.unit || 'kWh',
-                kwhEq: kwhEq
-              };
-            }
-          }
-
-          if (rec.timestamp) lastTimestamp = rec.timestamp;
-        });
-      } else {
-        // โหมดช่วงเวลา (7 วันล่าสุด, เดือนนี้, ช่วงวัน, ช่วงเดือน): คำนวณจากประวัติทุกจุดตามเงื่อนไขช่วงเวลา
-        METERS.forEach(m => {
-          const isMain = !!m.isMain;
-          if (dashTotalMode === 'subpanels' && isMain) return; // ตัดตู้ Main หากเลือกเฉพาะตู้ย่อย
-
-          const allPts = getAllPointsForMeter(m.id);
-          const filterPts = allPts.filter(p => isDateInFilter(p.date));
-
-          let meterPeriodKwh = 0;
-          filterPts.forEach(p => {
-            const dVal = Number(p.diff || 0);
-            const uVal = String(p.unit || 'kWh').toUpperCase();
-            const kEq = (p.kwhEq !== undefined && p.kwhEq !== null) ? Number(p.kwhEq) : ((uVal === 'MWH') ? (dVal * 1000) : dVal);
-            if (kEq > 0) meterPeriodKwh += kEq;
-            energyDates.add(p.date);
-              if (!p.filler) { uniqueDates.add(p.date);
-            totalLogsInPeriod++; }
-          });
-
-          totalCombinedKwh += meterPeriodKwh;
-
-          if (meterPeriodKwh > topKwhEq) {
-            topKwhEq = meterPeriodKwh;
-            topConsumer = {
-              id: m.id,
-              label: m.label,
-              name: m.name,
-              diff: meterPeriodKwh,
-              unit: 'kWh',
-              kwhEq: meterPeriodKwh
-            };
-          }
-        });
-      }
-
-      const totalCombinedMwh = totalCombinedKwh / 1000;
-
-      // Update Total Mode Badge in Card 1
-      const elModeBadge = document.getElementById('btnDashTotalModeBadge');
-      if (elModeBadge) {
-        if (dashTotalMode === 'subpanels') {
-          elModeBadge.innerText = '⚡ เฉพาะตู้ย่อย ⮂';
-          elModeBadge.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition cursor-pointer';
-          elModeBadge.title = 'กำลังแสดง: เฉพาะตู้ย่อย (ไม่นับซ้ำตู้ Main) แตะเพื่อสลับเป็นรวมทุกตู้';
-        } else {
-          elModeBadge.innerText = '🏢 รวมทุกตู้ (รวม Main) ⮂';
-          elModeBadge.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 transition cursor-pointer';
-          elModeBadge.title = 'กำลังแสดง: รวมทุกตู้ (รวมตู้ Main MDB/EMDB/HV) แตะเพื่อสลับเป็นเฉพาะตู้ย่อย';
-        }
-      }
-
-      // Update Dashboard Period Badge
       const elDashPeriodBadge = document.getElementById('dashActivePeriodBadge');
       if (elDashPeriodBadge) elDashPeriodBadge.innerText = periodLabel;
 
-      // 1. Update Card 1: Total Factory Consumption
+      // CARD 1: รวมไฟ (เฉพาะตู้ย่อย — ไม่นับซ้ำ) + ตู้ Main แสดงแยก
       const elCard1Title = document.getElementById('dashCard1Title');
-      if (elCard1Title) {
-        elCard1Title.innerHTML = `<span>⚡</span> รวมไฟทั้งโรงงาน <span class="text-[9px] font-normal text-amber-200">(${periodLabel}${isToday ? ' · ปรับเป็นต่อ 24 ชม.' : ''})</span>`;
-      }
+      if (elCard1Title) elCard1Title.innerHTML = `<span>⚡</span> รวมไฟทั้งโรงงาน <span class="text-[9px] font-normal text-amber-200">(${periodLabel}${isToday ? ' · ปรับเป็นต่อ 24 ชม.' : ''})</span>`;
       const elKwh = document.getElementById('dashTotalCombinedKwh');
       const elMwh = document.getElementById('dashTotalCombinedMwh');
-      if (elKwh) {
-        elKwh.innerHTML = `${totalCombinedKwh.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 4 })} <span class="text-xs font-bold text-amber-400">kWh</span>`;
-      }
-      if (elMwh) {
-        elMwh.innerText = `(= ${totalCombinedMwh.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 4 })} MWh)`;
-      }
+      if (elKwh) elKwh.innerHTML = `${subTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span class="text-xs font-bold text-amber-400">kWh</span>`;
+      if (elMwh) elMwh.innerText = `(= ${(subTotal / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} MWh)${mainTotal > 0 ? ` · ตู้ Main วัดได้ ${fmtKwh(mainTotal)} kWh` : ''}`;
 
-      // 2. Update Card 2: Top Peak Consumer
+      // CARD 2: จุดใช้ไฟสูงสุด (ในกลุ่มตู้ย่อย)
       const elCard2Title = document.getElementById('dashCard2Title');
-      if (elCard2Title) {
-        elCard2Title.innerHTML = `<span>🔥</span> จุดใช้ไฟสูงสุด <span class="text-[9px] font-normal text-purple-200">(${periodLabel})</span>`;
-      }
+      if (elCard2Title) elCard2Title.innerHTML = `<span>🔥</span> จุดใช้ไฟสูงสุด <span class="text-[9px] font-normal text-purple-200">(${periodLabel})</span>`;
       const elTopShareBadge = document.getElementById('dashTopShareBadge');
       const elTopConsumerName = document.getElementById('dashTopConsumerName');
       const elTopConsumerValue = document.getElementById('dashTopConsumerValue');
-
-      if (topConsumer && topKwhEq > 0) {
-        const topShare = totalCombinedKwh > 0 ? ((topConsumer.kwhEq / totalCombinedKwh) * 100).toFixed(1) : 0;
-        if (elTopShareBadge) elTopShareBadge.innerText = `${topShare}% ของรวม`;
+      if (topConsumer) {
+        const topShare = subTotal > 0 ? (topConsumer.kwh / subTotal * 100).toFixed(1) : 0;
+        if (elTopShareBadge) elTopShareBadge.innerText = `${topShare}% ของตู้ย่อย`;
         if (elTopConsumerName) elTopConsumerName.innerText = `[${topConsumer.label}] ${topConsumer.name}`;
-        if (elTopConsumerValue) {
-          if (isToday) {
-            elTopConsumerValue.innerText = `+${Number(topConsumer.diff).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${topConsumer.unit} ในรอบนี้ (≈ ${topConsumer.kwhEq.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh/24 ชม.)`;
-          } else {
-            elTopConsumerValue.innerText = `รวมช่วงนี้: ${topConsumer.kwhEq.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh (${topShare}%)`;
-          }
-        }
+        if (elTopConsumerValue) elTopConsumerValue.innerText = isToday
+          ? `+${fmtKwh(topConsumer.diff, 2)} ${topConsumer.unit} ในรอบนี้ (≈ ${fmtKwh(topConsumer.kwh)} kWh/24 ชม.)`
+          : `รวมช่วงนี้: ${fmtKwh(topConsumer.kwh)} kWh`;
       } else {
         if (elTopShareBadge) elTopShareBadge.innerText = `- %`;
         if (elTopConsumerName) elTopConsumerName.innerText = `รอข้อมูลจด`;
         if (elTopConsumerValue) elTopConsumerValue.innerText = `อัตราการใช้ไฟสูงสุด`;
       }
 
-      // 3. Update Card 3 & Card 4 (Context-Aware: Today vs Period)
+      // CARD 3 & 4
       const elCard3Title = document.getElementById('dashCard3Title');
       const elRecCount = document.getElementById('dashRecordedCount');
       const elRecTotal = document.getElementById('dashRecordedTotalText');
       const elProgressPercent = document.getElementById('dashProgressPercent');
       const elProgressBar = document.getElementById('dashProgressBar');
-
       const elCard4Title = document.getElementById('dashCard4Title');
       const elPendingBadge = document.getElementById('dashPendingBadge');
       const elInspectorName = document.getElementById('dashInspectorName');
@@ -2605,32 +2202,47 @@ function toggleDashTotalMode() {
         if (elRecTotal) elRecTotal.innerText = `/ ${total} จุด`;
         if (elProgressPercent) elProgressPercent.innerText = `${percent}%`;
         if (elProgressBar) elProgressBar.style.width = `${percent}%`;
-
         if (elCard4Title) elCard4Title.innerHTML = `<span>⚠️</span> รอจด`;
         if (elPendingBadge) elPendingBadge.innerText = `${pendingCount} จุด`;
         if (elInspectorName) elInspectorName.innerText = `👤 ${currentInspector || 'ยังไม่ระบุ'}`;
-        if (elLastUpdateTime) {
-          elLastUpdateTime.innerText = lastTimestamp ? `อัปเดต: ${lastTimestamp} น.` : 'ยังไม่มีบันทึกวันนี้';
-        }
+        if (elLastUpdateTime) elLastUpdateTime.innerText = lastTimestamp ? `อัปเดต: ${lastTimestamp} น.` : 'ยังไม่มีบันทึกวันนี้';
       } else {
-        const daysCount = energyDates.size || uniqueDates.size || 1;
-        const avgDailyKwh = totalCombinedKwh / daysCount;
+        // การ์ด 3: ความครบของการจด = จดจริง / (จำนวนตู้ × จำนวนวันในช่วง)
+        const rg = getActiveRange();
+        const nDays = daysBetween(rg.start, rg.end);
+        const expected = total * nDays;
+        const compPct = expected > 0 ? Math.min(100, Math.round(realLogs / expected * 100)) : 0;
+        if (elCard3Title) elCard3Title.innerHTML = `<span>📋</span> ความครบการจด`;
+        if (elRecCount) elRecCount.innerText = realLogs;
+        if (elRecTotal) elRecTotal.innerText = `/ ${expected} ครั้ง (${total} จุด × ${nDays} วัน)`;
+        if (elProgressPercent) elProgressPercent.innerText = `${compPct}%`;
+        if (elProgressBar) elProgressBar.style.width = `${compPct}%`;
 
-        if (elCard3Title) elCard3Title.innerHTML = `<span>📋</span> บันทึกในระบบ`;
-        if (elRecCount) elRecCount.innerText = totalLogsInPeriod;
-        if (elRecTotal) elRecTotal.innerText = `รายการ`;
-        if (elProgressPercent) elProgressPercent.innerText = `${daysCount} วัน`;
-        if (elProgressBar) elProgressBar.style.width = `100%`;
-
-        if (elCard4Title) elCard4Title.innerHTML = `<span>📊</span> เฉลี่ยต่อวัน`;
-        if (elPendingBadge) elPendingBadge.innerText = `${daysCount} วันที่มีข้อมูล`;
-        if (elInspectorName) elInspectorName.innerText = `⚡ ${avgDailyKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh/วัน`;
-        if (elLastUpdateTime) {
-          elLastUpdateTime.innerText = `ช่วงเวลา: ${periodLabel}`;
+        // การ์ด 4: เฉลี่ยต่อวัน (ตู้ย่อย) + เทียบช่วงก่อนหน้าที่ยาวเท่ากัน
+        // เฉลี่ยเฉพาะวันที่ครบวันแล้ว (ไม่นับวันนี้ที่ยังจดไม่ครบ 24 ชม. — กันค่าเฉลี่ยต่ำผิดจริง)
+        const todayStr = getFormatDateStr(new Date());
+        const fullDays = Object.keys(subByDate).filter(d => d < todayStr);
+        const avgDays = fullDays.length ? fullDays : Object.keys(subByDate);
+        const avgDaily = avgDays.length ? avgDays.reduce((a, d) => a + subByDate[d], 0) / avgDays.length : 0;
+        const pEnd = addDaysStr(rg.start, -1), pStart = addDaysStr(rg.start, -nDays);
+        let prevSum = 0; const prevDates = new Set();
+        METERS.filter(m => !m.isMain).forEach(m => getAllPointsForMeter(m.id).forEach(p => {
+          if (p.date >= pStart && p.date <= pEnd) { const k = Number(p.kwhEq || 0); if (k > 0) prevSum += k; prevDates.add(p.date); }
+        }));
+        let cmpTxt = 'ไม่มีข้อมูลช่วงก่อนหน้า', cmpCls = 'text-slate-400';
+        if (prevDates.size > 0 && prevSum > 0) {
+          const prevAvg = prevSum / prevDates.size;
+          const ch = (avgDaily - prevAvg) / prevAvg * 100;
+          cmpTxt = `${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}% เทียบ ${nDays} วันก่อนหน้า (${fmtKwh(prevAvg)} kWh/วัน)`;
+          cmpCls = ch >= 0 ? 'text-rose-300' : 'text-emerald-300';
         }
+        if (elCard4Title) elCard4Title.innerHTML = `<span>📊</span> เฉลี่ยต่อวัน (ตู้ย่อย)`;
+        if (elPendingBadge) elPendingBadge.innerText = `เฉลี่ยจาก ${avgDays.length} วัน${fullDays.length && fullDays.length < Object.keys(subByDate).length ? ' (ไม่นับวันนี้)' : ''}`;
+        if (elInspectorName) elInspectorName.innerText = `⚡ ${fmtKwh(avgDaily)} kWh/วัน`;
+        if (elLastUpdateTime) { elLastUpdateTime.innerText = cmpTxt; elLastUpdateTime.className = elLastUpdateTime.className.replace(/\btext-(slate|rose|emerald)-\d00\b/g, '') + ' ' + cmpCls; }
       }
 
-      // 2. Render 15-Meter Quick Glance Matrix (Optimized for 1-second mobile scan)
+      // ตารางสถานะด่วน 15 จุด = สถานะการจด "วันนี้" อย่างเดียว (ไม่มี % เพื่อไม่ปนกับช่วงเวลาที่เลือก)
       const glanceContainer = document.getElementById('dashGlanceGrid');
       if (glanceContainer) {
         glanceContainer.innerHTML = '';
@@ -2641,178 +2253,112 @@ function toggleDashTotalMode() {
           btn.type = 'button';
           btn.className = `p-2 rounded-xl text-left border flex flex-col justify-between transition active:scale-95 cursor-pointer shadow-xs ${isDone ? 'bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100/80' : 'bg-amber-50/80 border-amber-300 hover:bg-amber-100/80'}`;
           btn.onclick = () => openRecordModal(meter.id);
-
-          let curReadingText = '';
-          let diffText = 'รอจด';
-          let shareBadge = '';
           const meterUnit = rec ? (rec.unit || 'kWh') : (meter.defaultUnit || 'kWh');
-
+          let curReadingText, diffText = 'รอจด';
           if (isDone) {
             const diff = Number(rec.diff || 0);
-            const kwhEq = per24Kwh(meter.id, (meterUnit.toUpperCase() === 'MWH') ? (diff * 1000) : diff);
-            const share = (totalCombinedKwh > 0 && diff > 0) ? ((kwhEq / totalCombinedKwh) * 100).toFixed(1) : 0;
             curReadingText = `จดวันนี้: <b class="text-emerald-800 font-bold">${Number(rec.currentReading).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${meterUnit}</b>`;
             diffText = `+${diff.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${meterUnit}`;
-            if (Number(share) > 0) shareBadge = `<span class="text-[8px] font-bold text-emerald-700">(${share}%)</span>`;
           } else {
-            const prevVal = Number(meter.defaultPrev || 0);
-            curReadingText = `ก่อนหน้า: <b class="text-slate-700 font-bold">${prevVal.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${meterUnit}</b>`;
+            curReadingText = `ก่อนหน้า: <b class="text-slate-700 font-bold">${Number(meter.defaultPrev || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${meterUnit}</b>`;
           }
-
           btn.innerHTML = `
             <div class="flex items-center justify-between w-full mb-0.5">
-              <span class="font-black text-[11px] sm:text-xs ${isDone ? 'text-emerald-950' : 'text-amber-950'}">${meter.label}</span>
-              <span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${isDone ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}">
-                ${isDone ? '✓' : '!'}
-              </span>
+              <span class="font-black text-[11px] sm:text-xs ${isDone ? 'text-emerald-950' : 'text-amber-950'}">${meter.label}${meter.isMain ? ' <span class="text-[8px] font-bold text-purple-700">Main</span>' : ''}</span>
+              <span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${isDone ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}">${isDone ? '✓' : '!'}</span>
             </div>
-            <div class="text-[9px] text-slate-500 font-mono truncate mb-0.5">
-              ${curReadingText}
-            </div>
-            <div class="text-[9px] sm:text-[10px] font-mono font-bold truncate ${isDone ? 'text-emerald-800' : 'text-amber-800'}">
-              ${isDone ? `${diffText} ${shareBadge}` : '⚠️ รอจดวันนี้'}
-            </div>
-          `;
+            <div class="text-[9px] text-slate-500 font-mono truncate mb-0.5">${curReadingText}</div>
+            <div class="text-[9px] sm:text-[10px] font-mono font-bold truncate ${isDone ? 'text-emerald-800' : 'text-amber-800'}">${isDone ? diffText : '⚠️ รอจดวันนี้'}</div>`;
           glanceContainer.appendChild(btn);
         });
       }
 
-      // 3. Render Detailed Breakdown Cards
+      // รายการอันดับการใช้ไฟของช่วงที่เลือก (ตามกลุ่มจุดที่เลือกในกราฟ) — ตู้ย่อยเทียบกับตู้ย่อย, ตู้ Main เทียบกับตู้ Main
       const breakdownContainer = document.getElementById('dashBreakdownCards');
       if (breakdownContainer) {
         breakdownContainer.innerHTML = '';
-
-        let displayMeters = [...METERS];
-
-        if (dashFilter === 'done') {
-          displayMeters = displayMeters.filter(m => !!recordsData[m.id]);
-        } else if (dashFilter === 'pending') {
-          displayMeters = displayMeters.filter(m => !recordsData[m.id]);
-        } else if (dashFilter === 'subpanels') {
-          displayMeters = displayMeters.filter(m => !m.isMain);
-        } else if (dashFilter === 'mains') {
-          displayMeters = displayMeters.filter(m => !!m.isMain);
-        } else if (dashFilter === 'top') {
-          displayMeters.sort((a, b) => {
-            const recA = recordsData[a.id];
-            const recB = recordsData[b.id];
-            const kwhEqA = recA ? ((String(recA.unit).toUpperCase() === 'MWH' ? Number(recA.diff) * 1000 : Number(recA.diff)) || 0) : -1;
-            const kwhEqB = recB ? ((String(recB.unit).toUpperCase() === 'MWH' ? Number(recB.diff) * 1000 : Number(recB.diff)) || 0) : -1;
-            return kwhEqB - kwhEqA;
-          });
-        }
-
+        const shown = METERS.filter(m => !chartExcludedIds.has(m.id));
+        const byKwh = (a, b) => (energy[b.id].kwh - energy[a.id].kwh) || ((energy[b.id].hasData ? 1 : 0) - (energy[a.id].hasData ? 1 : 0));
+        const displayMeters = [...shown.filter(m => !m.isMain).sort(byKwh), ...shown.filter(m => m.isMain).sort(byKwh)];
+        const bTitle = document.getElementById('dashBreakdownTitle');
+        if (bTitle) bTitle.innerText = `อันดับการใช้ไฟแต่ละจุด (${periodLabel})`;
         const countText = document.getElementById('dashItemsCountText');
-        if (countText) countText.innerText = `${displayMeters.length} จุด`;
+        if (countText) countText.innerText = `${displayMeters.length} จุด · ตามกลุ่มที่เลือกในกราฟ`;
 
         if (displayMeters.length === 0) {
-          breakdownContainer.innerHTML = `
-            <div class="col-span-full text-center py-8 text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
-              ไม่พบรายการมิเตอร์ในหมวดนี้
-            </div>
-          `;
-          return;
+          breakdownContainer.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">ไม่มีจุดที่เลือก — เลือกกลุ่มจุดในกราฟด้านบน</div>`;
         }
-
+        let rank = 0;
         displayMeters.forEach((meter) => {
+          const e = energy[meter.id];
           const rec = recordsData[meter.id];
           const isDone = !!rec;
-          const card = document.createElement('div');
-          card.className = `bg-white rounded-2xl border p-3.5 shadow-sm transition hover:shadow-md flex flex-col justify-between ${isDone ? 'border-slate-200' : 'border-amber-200 bg-amber-50/15'}`;
-
+          if (!meter.isMain) rank++;
+          const typeTotal = meter.isMain ? mainTotal : subTotal;
+          const share = (typeTotal > 0 && e.kwh > 0) ? Math.round(e.kwh / typeTotal * 1000) / 10 : 0;
           const unit = rec ? (rec.unit || 'kWh') : (meter.defaultUnit || 'kWh');
-          const diffVal = rec ? Number(rec.diff || 0) : 0;
-          const kwhEq = (unit.toUpperCase() === 'MWH') ? (diffVal * 1000) : diffVal;
-          const sharePercent = (totalCombinedKwh > 0 && diffVal > 0) ? Math.min(Math.round((kwhEq / totalCombinedKwh) * 1000) / 10, 100) : 0;
-
+          const card = document.createElement('div');
+          card.className = `bg-white rounded-2xl border p-3.5 shadow-sm transition hover:shadow-md flex flex-col justify-between ${meter.isMain ? 'border-purple-200 bg-purple-50/20' : 'border-slate-200'}`;
+          let mainMetric;
+          if (!e.hasData) {
+            mainMetric = `<span class="text-xs font-bold text-amber-600">⚠️ ไม่มีข้อมูลในช่วงนี้</span>`;
+          } else if (isToday) {
+            mainMetric = `<span class="font-mono font-black text-lg ${e.diff >= 0 ? 'text-emerald-700' : 'text-rose-600'}">${e.diff >= 0 ? '+' : ''}${e.diff.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span><span class="text-xs font-bold text-slate-700 ml-0.5">${e.unit}</span>`;
+          } else {
+            mainMetric = `<span class="font-mono font-black text-lg text-emerald-700">${fmtKwh(e.kwh)}</span><span class="text-xs font-bold text-slate-700 ml-0.5">kWh</span>`;
+          }
+          const subLine = !e.hasData ? '' : (isToday
+            ? `≈ ${fmtKwh(e.kwh)} kWh/24 ชม.`
+            : `จดจริง ${e.real} วัน${e.unit.toUpperCase() === 'MWH' ? ` · (= ${fmtKwh(e.kwh / 1000, 3)} MWh)` : ''}`);
           card.innerHTML = `
             <div>
-              <!-- Header -->
               <div class="flex items-start justify-between gap-2 mb-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap">
+                    ${meter.isMain ? '<span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-purple-600 text-white">🏢 Main</span>' : `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">#${rank}</span>`}
                     <span class="px-2 py-0.5 rounded-md text-xs font-black bg-slate-900 text-amber-400">${meter.label}</span>
                     <span class="font-bold text-slate-900 text-sm truncate">${meter.name}</span>
                   </div>
                   <p class="text-[11px] text-slate-500 truncate mt-0.5">${meter.loads || meter.type}</p>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${unit === 'MWh' ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-blue-100 text-blue-800 border border-blue-300'}">
-                    ${unit}
-                  </span>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
-                    ${isDone ? '✓ จดแล้ว' : '⚠️ รอจด'}
-                  </span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${unit === 'MWh' ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-blue-100 text-blue-800 border border-blue-300'}">${unit}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">${isDone ? '✓ จดวันนี้แล้ว' : '⚠️ วันนี้ยังไม่จด'}</span>
                 </div>
               </div>
-
-              <!-- Main Metric: Consumed Units & Share of Overall -->
               <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-100 mb-2.5">
                 <div class="flex items-baseline justify-between mb-1">
-                  <span class="text-[10px] font-semibold text-slate-500">หน่วยที่ใช้รอบนี้ (แยกหน่วยจด):</span>
-                  <div class="text-right">
-                    ${isDone ? `
-                      <span class="font-mono font-black text-lg ${diffVal >= 0 ? 'text-emerald-700' : 'text-rose-600'}">
-                        ${diffVal >= 0 ? '+' : ''}${diffVal.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                      </span>
-                      <span class="text-xs font-bold text-slate-700 ml-0.5">${unit}</span>
-                    ` : `
-                      <span class="text-xs font-bold text-amber-600">⚠️ ยังไม่ได้จดค่าวันนี้</span>
-                    `}
-                  </div>
+                  <span class="text-[10px] font-semibold text-slate-500">${isToday ? 'หน่วยที่ใช้รอบนี้:' : `ใช้ไฟช่วง ${periodLabel}:`}</span>
+                  <div class="text-right">${mainMetric}</div>
                 </div>
-
-                ${isDone ? `
-                  <!-- Overall Rate & Comparison -->
+                ${e.hasData ? `
                   <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 mb-1.5">
-                    <span>
-                      ${unit.toUpperCase() === 'MWH' ? `<b class="text-purple-700 font-mono">(= ${kwhEq.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)</b>` : `<span>เทียบเท่า ${kwhEq.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh</span>`}
-                    </span>
-                    <span class="font-bold text-emerald-700">
-                      ⚡ สัดส่วน: ${sharePercent}% ของทั้งโรงงาน
-                    </span>
+                    <span>${subLine}</span>
+                    <span class="font-bold ${meter.isMain ? 'text-purple-700' : 'text-emerald-700'}">${share}% ${meter.isMain ? 'ของตู้ Main รวม' : 'ของตู้ย่อยทั้งหมด'}</span>
                   </div>
-
-                  <!-- Relative Load Bar (Share of Total) -->
                   <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: ${Math.max(sharePercent, 2)}%"></div>
-                  </div>
-                ` : ''}
+                    <div class="${meter.isMain ? 'bg-purple-500' : 'bg-emerald-500'} h-full rounded-full transition-all duration-300" style="width: ${Math.max(share, 2)}%"></div>
+                  </div>` : ''}
               </div>
-
-              <!-- Readings Comparison Grid -->
               <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-50/70 rounded-xl p-2 border border-slate-100 mb-3">
                 <div>
                   <span class="text-slate-400 block text-[9px]">เลขครั้งก่อน:</span>
-                  <span class="font-mono font-bold text-slate-700">
-                    ${rec ? rec.prevReading.toLocaleString(undefined, { maximumFractionDigits: 6 }) : meter.defaultPrev.toLocaleString(undefined, { maximumFractionDigits: 6 })} <span class="text-[9px] font-normal text-slate-400">${unit}</span>
-                  </span>
+                  <span class="font-mono font-bold text-slate-700">${Number(rec ? rec.prevReading : meter.defaultPrev || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} <span class="text-[9px] font-normal text-slate-400">${unit}</span></span>
                 </div>
                 <div>
-                  <span class="text-slate-400 block text-[9px]">เลขที่จดปัจจุบัน:</span>
-                  <span class="font-mono font-black ${isDone ? 'text-emerald-700 text-xs' : 'text-slate-400'}">
-                    ${isDone ? rec.currentReading.toLocaleString(undefined, { maximumFractionDigits: 6 }) + ' ' + unit : '-'}
-                  </span>
+                  <span class="text-slate-400 block text-[9px]">เลขที่จดวันนี้:</span>
+                  <span class="font-mono font-black ${isDone ? 'text-emerald-700 text-xs' : 'text-slate-400'}">${isDone ? Number(rec.currentReading).toLocaleString(undefined, { maximumFractionDigits: 6 }) + ' ' + unit : '-'}</span>
                 </div>
               </div>
             </div>
-
-            <!-- Footer Action & Inspector -->
             <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-              <span class="text-[10px] text-slate-400 truncate">
-                ${isDone ? `🕒 ${rec.timestamp} น. • ${rec.inspector || currentInspector}` : 'รอช่างบันทึกค่า'}
-              </span>
-              <button type="button" onclick="openRecordModal('${meter.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${isDone ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-sm'}">
-                ${isDone ? '✏️ แก้ไข' : '📝 บันทึก'}
-              </button>
-            </div>
-          `;
-
+              <span class="text-[10px] text-slate-400 truncate">${isDone ? `🕒 ${rec.timestamp} น. • ${rec.inspector || currentInspector}` : 'รอช่างบันทึกค่า'}</span>
+              <button type="button" onclick="openRecordModal('${meter.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${isDone ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-amber-500 hover:bg-amber-400 text-slate-950'}">${isDone ? '✏️ แก้ไข' : '📝 บันทึก'}</button>
+            </div>`;
           breakdownContainer.appendChild(card);
         });
       }
 
-      // Render Visual Analytics & Trend Charts (Chart.js)
       renderAnalyticsChart();
     }
 
@@ -2829,13 +2375,16 @@ function toggleDashTotalMode() {
       const recordedCount = recordedKeys.length;
       const percent = Math.round((recordedCount / total) * 100);
 
-      let totalCombinedKwh = 0;
+      // รวมเฉพาะตู้ย่อย (ไม่นับซ้ำตู้ Main) ปรับเป็นต่อ 24 ชม. — ให้ตรงกับการ์ดบนแดชบอร์ด
+      const kwh24 = {};
+      let totalCombinedKwh = 0, mainKwh = 0;
       recordedKeys.forEach(k => {
         const rec = recordsData[k];
+        const m = METERS.find(x => x.id === k);
         const diff = Number(rec.diff || 0);
-        const unit = String(rec.unit || 'kWh').toUpperCase();
-        const kwhEq = (unit === 'MWH') ? (diff * 1000) : diff;
-        if (diff > 0) totalCombinedKwh += kwhEq;
+        const v = diff > 0 ? per24Kwh(k, toKwh(diff, rec.unit)) : 0;
+        kwh24[k] = v;
+        if (m && m.isMain) mainKwh += v; else totalCombinedKwh += v;
       });
 
       const totalCombinedMwh = totalCombinedKwh / 1000;
@@ -2846,9 +2395,11 @@ function toggleDashTotalMode() {
       lines.push(`📅 ${dateFormatted} (ณ เวลา ${timeFormatted} น.)`);
       lines.push(`👤 ผู้ตรวจ: ${insp}`);
       lines.push(`📊 ความคืบหน้า: จดแล้ว ${recordedCount}/${total} จุด (${percent}%)`);
-      lines.push(`🔋 ไฟฟ้ารวมทั้งโรงงาน: ${totalCombinedKwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} kWh (= ${totalCombinedMwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} MWh)`);
+      lines.push(`🔋 ไฟฟ้ารวม (ตู้ย่อย, ต่อ 24 ชม.): ${totalCombinedKwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} kWh (= ${totalCombinedMwh.toLocaleString(undefined, { maximumFractionDigits: 4 })} MWh)`);
       lines.push(`---------------------------`);
-      lines.push(`📋 อัตราการใช้ไฟแยกแต่ละจุด (ในองค์รวม):`);
+      if (mainKwh > 0) lines.push(`🏢 ตู้ Main วัดได้: ${mainKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh (แสดงแยก ไม่บวกรวม)`);
+      lines.push(`---------------------------`);
+      lines.push(`📋 อัตราการใช้ไฟแยกแต่ละจุด (% ของตู้ย่อยทั้งหมด):`);
 
       METERS.forEach((m, idx) => {
         const rec = recordsData[m.id];
@@ -2856,10 +2407,9 @@ function toggleDashTotalMode() {
           const diff = Number(rec.diff || 0);
           const diffStr = (diff >= 0 ? '+' : '') + diff.toLocaleString(undefined, { maximumFractionDigits: 4 });
           const unitStr = rec.unit || 'kWh';
-          const kwhEq = (unitStr.toUpperCase() === 'MWH') ? (diff * 1000) : diff;
-          const share = (totalCombinedKwh > 0 && diff > 0) ? ((kwhEq / totalCombinedKwh) * 100).toFixed(1) : 0;
+          const tail = m.isMain ? '🏢 Main' : `${(totalCombinedKwh > 0 && kwh24[m.id] > 0) ? (kwh24[m.id] / totalCombinedKwh * 100).toFixed(1) : 0}%`;
           const curStr = Number(rec.currentReading || 0).toLocaleString(undefined, { maximumFractionDigits: 4 });
-          lines.push(`${idx + 1}. [${m.label}] ${m.id}: เลขปัจจุบัน ${curStr} | ใช้ไป ${diffStr} ${unitStr} (${share}%)`);
+          lines.push(`${idx + 1}. [${m.label}] ${m.id}: เลขปัจจุบัน ${curStr} | ใช้ไป ${diffStr} ${unitStr} (${tail})`);
         } else {
           lines.push(`${idx + 1}. [${m.label}] ${m.id}: ⚠️ ยังไม่ได้จด`);
         }
@@ -2913,7 +2463,7 @@ function toggleDashTotalMode() {
       document.getElementById('formMeterId').value = meter.id;
       document.getElementById('modalMeterId').innerText = meter.name;
       document.getElementById('modalCabinetType').innerText = meter.type;
-      renderModalMachines(meter);
+      document.getElementById('modalLoads').innerText = meter.loads;
 
       // เลขและหน่วยครั้งก่อนหน้า (เพื่อใช้ตรวจจับการขยับหน่วยในอนาคต เช่น kWh ➔ MWh)
       const prevVal = existing ? Number(existing.prevReading || 0) : Number(meter.defaultPrev || 0);
@@ -3174,11 +2724,9 @@ function toggleDashTotalMode() {
               renderHotspots();
               renderCards();
               renderDashboard();
-              const savedId = activeMeter.id;
               closeRecordModal();
               showToast(`✓ บันทึกค่า ${activeMeter.name} ลง Google Sheet สำเร็จ` + (res.data && res.data.photoUrl ? ' + รูป 📷' : ''));
               if (res.photoError) alert('บันทึกค่ามิเตอร์แล้ว แต่อัปโหลดรูปไม่สำเร็จ:\n' + res.photoError + '\n\nลองเปิดจุดนี้แล้วแนบรูปใหม่อีกครั้ง');
-              try { showNextSuggestion(savedId); } catch (e) { console.warn(e); }
             } else {
               alert('ข้อผิดพลาดจาก Google Sheets: ' + (res ? res.message : 'ไม่ทราบสาเหตุ'));
             }
@@ -3561,7 +3109,7 @@ function toggleDashTotalMode() {
       
       updateChartPresetButtons();
       renderChartMeterChips();
-      renderAnalyticsChart(currentChartMode);
+      renderDashboard();
     }
 
     function toggleChartMeter(meterId) {
@@ -3580,7 +3128,7 @@ function toggleDashTotalMode() {
 
       updateChartPresetButtons();
       renderChartMeterChips();
-      renderAnalyticsChart(currentChartMode);
+      renderDashboard();
     }
 
     function selectAllChartMeters(selectAll) {
@@ -3596,7 +3144,7 @@ function toggleDashTotalMode() {
 
       updateChartPresetButtons();
       renderChartMeterChips();
-      renderAnalyticsChart(currentChartMode);
+      renderDashboard();
     }
 
     function toggleCustomMetersDrawer() {
@@ -3669,7 +3217,7 @@ function toggleDashTotalMode() {
           countBadge.innerText = `แสดง ${activeCount}/15 จุด (เฉพาะตู้ Main)`;
           countBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-300';
         } else if (chartFilterPreset === 'all') {
-          countBadge.innerText = `แสดงครบ 15/15 จุด`;
+          countBadge.innerText = `ทั้งหมด ${METERS.length} จุด (ตู้ Main แยกเส้น ไม่บวกรวม)`;
           countBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-300';
         } else {
           countBadge.innerText = `กำหนดเอง ${activeCount}/15 จุด`;
@@ -3735,353 +3283,154 @@ function toggleDashTotalMode() {
       let borderColors = [];
       let extraData = [];
       let datasetLabel = '';
+      let series2 = null; // ชุดข้อมูลที่ 2 (ตู้ Main) เมื่อเลือกทั้งตู้ย่อยและตู้ Main — แสดงแยก ไม่บวกรวม
+      const metricType = (mode === 'single') ? chartMetricType : 'diff';
+      const metricWrap = document.getElementById('chartTimeFilterWrap');
+      if (metricWrap) metricWrap.classList.toggle('hidden', mode !== 'single');
 
       if (mode === 'meters') {
         hideChartEmptyState();
         const displayMeters = METERS.filter(m => !chartExcludedIds.has(m.id));
-
         if (displayMeters.length === 0) {
-          showChartEmptyState(
-            'ไม่มีจุดที่เลือกแสดง',
-            'คุณยกเว้นการแสดงผลทุกจุด กรุณาแตะ "เลือกจุดเอง" หรือ "แสดงครบ 15 จุด" ด้านบน'
-          );
+          showChartEmptyState('ไม่มีจุดที่เลือกแสดง', 'กรุณาแตะ "เลือกจุดเอง" หรือเลือกกลุ่มจุดด้านบน');
           return;
         }
-
         chartType = 'bar';
-        const isReading = (chartMetricType === 'reading');
-
-        if (titleEl) {
-          const metricText = isReading ? '🔢 ค่าเลขมิเตอร์ที่จดมา (Reading)' : '⚡ อัตราการใช้ไฟ (+ หน่วยที่ใช้)';
-          let groupText = '';
-          if (chartFilterPreset === 'subpanels') groupText = 'เฉพาะตู้ย่อย (ไม่รวม Main)';
-          else if (chartFilterPreset === 'mains') groupText = 'เฉพาะตู้ Main อาคาร';
-          else groupText = `${displayMeters.length}/15 จุด`;
-
-          titleEl.innerText = `${metricText} - ${groupText}`;
-        }
-
-        if (subTitleEl) {
-          if (isReading) {
-            subTitleEl.innerText = `แสดงตัวเลขมิเตอร์ล่าสุดตามช่วงเวลา [${periodLabel}] (แตะแท่งกราฟเพื่อดูรายละเอียด)`;
-          } else {
-            subTitleEl.innerText = `เปรียบเทียบปริมาณพลังงานไฟฟ้าที่ใช้ในช่วง [${periodLabel}] ในสเกลเทียบเท่า kWh`;
-          }
-        }
-
-        datasetLabel = isReading ? 'ค่าเลขมิเตอร์ล่าสุด (Reading)' : 'อัตราการใช้ไฟ (kWh)';
-
-        // Calculate total consumption in group for percentages
-        let groupTotalKwh = 0;
-        let factoryTotalKwh = 0;
-
+        const groupText = chartFilterPreset === 'subpanels' ? 'เฉพาะตู้ย่อย' : chartFilterPreset === 'mains' ? 'เฉพาะตู้ Main' : `${displayMeters.length}/${METERS.length} จุด`;
+        if (titleEl) titleEl.innerText = `📊 การใช้ไฟแต่ละจุด (kWh) - ${groupText}`;
+        if (subTitleEl) subTitleEl.innerText = `ช่วง [${periodLabel}]${chartPeriodMode === 'today' ? ' · ปรับเป็นต่อ 24 ชม.' : ''} · สีเขียว = ตู้ย่อย, สีม่วง = ตู้ Main (% คิดแยกกลุ่ม ไม่นับซ้ำ)`;
+        datasetLabel = 'การใช้ไฟ (kWh)';
+        const en = {};
+        let subAll = 0, mainAll = 0, subShown = 0, mainShown = 0;
         METERS.forEach(m => {
-          const allPts = getAllPointsForMeter(m.id).filter(p => isDateInFilter(p.date));
-          const meterDiffSum = allPts.reduce((acc, p) => acc + Number(p.kwhEq || 0), 0);
-          factoryTotalKwh += meterDiffSum;
-          if (!chartExcludedIds.has(m.id)) {
-            groupTotalKwh += meterDiffSum;
-          }
+          const e = en[m.id] = meterEnergyForActivePeriod(m);
+          if (m.isMain) mainAll += e.kwh; else subAll += e.kwh;
+          if (!chartExcludedIds.has(m.id)) { if (m.isMain) mainShown += e.kwh; else subShown += e.kwh; }
         });
-
         let recordedInDisplayCount = 0;
-
         displayMeters.forEach(meter => {
+          const e = en[meter.id];
           labels.push(meter.label);
-          const allPts = getAllPointsForMeter(meter.id).filter(p => isDateInFilter(p.date));
-          const recToday = recordsData[meter.id];
-
-          let valToPlot = 0;
-          let latestReading = 0;
-          let totalDiffInPeriod = 0;
-          let meterUnit = meter.defaultUnit || 'kWh';
-          let hasData = false;
-
-          if (allPts.length > 0) {
-            hasData = true;
-            recordedInDisplayCount++;
-            const latestPt = allPts[allPts.length - 1];
-            latestReading = Number(latestPt.reading !== undefined ? latestPt.reading : (recToday?.currentReading || meter.defaultPrev || 0));
-            meterUnit = latestPt.unit || meterUnit;
-            totalDiffInPeriod = allPts.reduce((sum, p) => sum + Number(p.diff || 0), 0);
-            const totalKwhEq = allPts.reduce((sum, p) => sum + Number(p.kwhEq || 0), 0);
-
-            if (isReading) {
-              valToPlot = toKwh(latestReading, meterUnit); // แท่งกราฟเทียบกันเป็น kWh ทุกตู้
-            } else {
-              valToPlot = totalKwhEq;
-            }
-          } else if (chartPeriodMode === 'today' && recToday) {
-            hasData = true;
-            recordedInDisplayCount++;
-            latestReading = Number(recToday.currentReading || 0);
-            meterUnit = recToday.unit || meterUnit;
-            totalDiffInPeriod = Number(recToday.diff || 0);
-            const kwhEq = per24Kwh(meter.id, (meterUnit.toUpperCase() === 'MWH') ? (totalDiffInPeriod * 1000) : totalDiffInPeriod);
-            valToPlot = isReading ? toKwh(latestReading, meterUnit) : kwhEq;
+          if (e.hasData) recordedInDisplayCount++;
+          dataValues.push(e.kwh);
+          if (e.hasData && e.kwh > 0) {
+            bgColors.push(meter.isMain ? 'rgba(147, 51, 234, 0.85)' : 'rgba(16, 185, 129, 0.85)');
+            borderColors.push(meter.isMain ? '#7e22ce' : '#059669');
           } else {
-            // No data in this range
-            latestReading = Number(recToday?.currentReading || meter.defaultPrev || 0);
-            valToPlot = isReading ? toKwh(latestReading, meterUnit) : 0;
+            bgColors.push('rgba(245, 158, 11, 0.35)');
+            borderColors.push('#d97706');
           }
-
-          dataValues.push(valToPlot);
-
-          // Colors
-          if (isReading) {
-            bgColors.push(meter.isMain ? 'rgba(99, 102, 241, 0.85)' : 'rgba(14, 165, 233, 0.85)');
-            borderColors.push(meter.isMain ? '#4f46e5' : '#0284c7');
-          } else {
-            if (hasData && valToPlot > 0) {
-              bgColors.push(meter.isMain ? 'rgba(147, 51, 234, 0.85)' : 'rgba(16, 185, 129, 0.85)');
-              borderColors.push(meter.isMain ? '#7e22ce' : '#059669');
-            } else {
-              bgColors.push('rgba(245, 158, 11, 0.35)');
-              borderColors.push('#d97706');
-            }
-          }
-
-          const kwhEqVal = (meterUnit.toUpperCase() === 'MWH') ? (totalDiffInPeriod * 1000) : totalDiffInPeriod;
-          const groupShare = (groupTotalKwh > 0 && totalDiffInPeriod > 0) ? ((kwhEqVal / groupTotalKwh) * 100).toFixed(1) : 0;
-          const factoryShare = (factoryTotalKwh > 0 && totalDiffInPeriod > 0) ? ((kwhEqVal / factoryTotalKwh) * 100).toFixed(1) : 0;
-
+          const tAll = meter.isMain ? mainAll : subAll, tShown = meter.isMain ? mainShown : subShown;
           extraData.push({
-            name: meter.name,
-            currentReading: latestReading,
-            diff: totalDiffInPeriod,
-            unit: meterUnit,
-            kwhEq: kwhEqVal,
-            groupShare: groupShare,
-            factoryShare: factoryShare,
-            isMain: !!meter.isMain,
-            hasData: hasData,
-            periodLabel: periodLabel
+            name: meter.name, currentReading: e.reading, unit: e.unit, diff: e.diff, kwhEq: e.kwh,
+            isMain: !!meter.isMain, hasData: e.hasData, realDays: e.real, today: !!e.today,
+            groupShare: (tShown > 0 && e.kwh > 0) ? (e.kwh / tShown * 100).toFixed(1) : 0,
+            factoryShare: (tAll > 0 && e.kwh > 0) ? (e.kwh / tAll * 100).toFixed(1) : 0
           });
         });
-
-        if (recordedInDisplayCount === 0 && !isReading) {
-          showChartEmptyState(
-            `ยังไม่มีข้อมูลการใช้ไฟของ [${periodLabel}]`,
-            'ช่างยังไม่ได้เริ่มเดินจดบันทึกค่าของรอบวันนี้ แตะที่กล่องจุดตรวจด้านบนเพื่อเริ่มจด หรือแตะเลือกแท็บช่วงเวลา "7 วันล่าสุด" / "เดือนนี้" ด้านบนเพื่อดูประวัติการใช้ไฟ'
-          );
-          if (footerNote) {
-            footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span><span>ช่วง [${periodLabel}]: ยังไม่มีข้อมูลบันทึกในระบบ (แนะนำเลือก '7 วันล่าสุด' หรือสลับเป็น 'ค่าเลขมิเตอร์ที่จดมา')</span>`;
-          }
+        if (recordedInDisplayCount === 0) {
+          showChartEmptyState(`ยังไม่มีข้อมูลการใช้ไฟของ [${periodLabel}]`, 'ยังไม่มีการจดในช่วงนี้ แตะที่กล่องจุดตรวจด้านบนเพื่อบันทึก หรือเลือก "7 วันล่าสุด"');
+          if (footerNote) footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span><span>ช่วง [${periodLabel}]: ยังไม่มีข้อมูลบันทึกในระบบ</span>`;
           return;
         }
-
         if (footerNote) {
-          footerNote.innerHTML = recordedInDisplayCount > 0
-            ? `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span><span>ช่วง [${periodLabel}]: มีข้อมูล ${recordedInDisplayCount}/${displayMeters.length} จุด (${isReading ? 'แท่งกราฟ = เลขมิเตอร์' : 'แท่งกราฟ = ปริมาณไฟที่ใช้ kWh'})</span>`
-            : `<span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span><span>ช่วง [${periodLabel}]: ยังไม่มีข้อมูลบันทึกในระบบ</span>`;
+          const parts = [];
+          if (subShown > 0) parts.push(`ตู้ย่อยรวม <b>${fmtKwh(subShown)} kWh</b>`);
+          if (mainShown > 0) parts.push(`ตู้ Main รวม <b>${fmtKwh(mainShown)} kWh</b>`);
+          footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span><span>ช่วง [${periodLabel}]: มีข้อมูล ${recordedInDisplayCount}/${displayMeters.length} จุด${parts.length ? ' | ' + parts.join(' · ') : ''}</span>`;
         }
-
-      } else if (mode === 'daily') {
+      } else if (mode === 'daily' || mode === 'monthly') {
+        const isMonthly = (mode === 'monthly');
         const activeMeters = METERS.filter(m => !chartExcludedIds.has(m.id));
-
         if (activeMeters.length === 0) {
-          showChartEmptyState(
-            'ไม่มีจุดที่เลือกแสดง',
-            'คุณยกเว้นการแสดงผลทุกจุด กรุณาแตะ "เลือกจุดเอง" หรือ "แสดงครบ 15 จุด" ด้านบน'
-          );
+          showChartEmptyState('ไม่มีจุดที่เลือกแสดง', 'กรุณาแตะ "เลือกจุดเอง" หรือเลือกกลุ่มจุดด้านบน');
           return;
         }
-
-        const isReading = (chartMetricType === 'reading');
-        let groupTitle = '';
-        if (chartFilterPreset === 'subpanels') groupTitle = '⚡ รวมจุดย่อย (ไม่นับซ้ำ Main)';
-        else if (chartFilterPreset === 'mains') groupTitle = '🏢 จุดหลัก (เฉพาะตู้ Main)';
-        else if (chartFilterPreset === 'all') groupTitle = '🌐 รวมครบ 15 จุด';
-        else groupTitle = `⚙️ รวมที่เลือก (${activeMeters.length} จุด)`;
-
-        if (titleEl) {
-          titleEl.innerText = isReading 
-            ? `📈 กราฟแนวโน้มเลขมิเตอร์รายวัน - ${groupTitle}`
-            : `📈 กราฟแนวโน้มการใช้ไฟรายวัน (kWh) - ${groupTitle}`;
-        }
-        if (subTitleEl) {
-          subTitleEl.innerText = isReading
-            ? `ติดตามตัวเลขหน้าปัดมิเตอร์รายวัน (${activeMeters.length} จุด) ในช่วง [${periodLabel}]`
-            : `เปรียบเทียบปริมาณพลังงานไฟฟ้า (kWh) ในช่วง [${periodLabel}] รวม ${activeMeters.length} จุด`;
-        }
-
-        let daysMap = {};
-        activeMeters.forEach(m => {
-          const pts = getAllPointsForMeter(m.id).filter(p => isDateInFilter(p.date));
-          pts.forEach(p => {
-            if (!daysMap[p.date]) {
-              daysMap[p.date] = { sumKwh: 0, sumMeasured: 0, sumReading: 0, count: 0, real: 0, partial: false, meterNames: [] };
-            }
-            const kwh = Number(p.chartKwh !== undefined ? p.chartKwh : (p.kwhEq || 0));
-            const rd = Number(p.readingKwh || 0);
-            daysMap[p.date].sumKwh += kwh;
-            daysMap[p.date].sumMeasured += Number(p.kwhEq || 0);
-            if (!p.filler) daysMap[p.date].real++;
-            if (p.partial) daysMap[p.date].partial = true;
-            daysMap[p.date].sumReading += rd;
-            daysMap[p.date].count += 1;
-            daysMap[p.date].meterNames.push(m.label);
-          });
-        });
-
-        const sortedDays = Object.keys(daysMap).sort();
-
-        if (sortedDays.length === 0) {
+        // ตู้ Main กับตู้ย่อย "ไม่นำมาบวกกัน" (ไฟจากตู้ Main ไหลผ่านตู้ย่อย บวกกันจะนับซ้ำ) — ถ้าเลือกทั้ง 2 กลุ่ม จะแสดงเป็น 2 ชุดข้อมูลแยกกัน
+        const subs = activeMeters.filter(m => !m.isMain), mains = activeMeters.filter(m => m.isMain);
+        const mixed = subs.length > 0 && mains.length > 0;
+        const primList = subs.length ? subs : mains;
+        const primTitle = subs.length ? `⚡ ตู้ย่อย (${subs.length} จุด)` : `🏢 ตู้ Main (${mains.length} จุด)`;
+        const groupTitle = mixed ? `⚡ ตู้ย่อย ${subs.length} จุด + 🏢 ตู้ Main ${mains.length} จุด (แยกกัน ไม่บวกรวม)` : primTitle;
+        const keyOf = d => isMonthly ? d.substring(0, 7) : d;
+        const inRange = d => isMonthly ? (chartPeriodMode === 'customMonths' ? isDateInFilter(d) : true) : isDateInFilter(d);
+        const build = list => {
+          const map = {};
+          list.forEach(m => getAllPointsForMeter(m.id).forEach(p => {
+            if (!inRange(p.date)) return;
+            const k = keyOf(p.date);
+            const o = map[k] || (map[k] = { sumKwh: 0, sumMeasured: 0, real: 0, partial: false, minD: p.date, maxD: p.date, meters: new Set() });
+            const kwh = Number(p.kwhEq || 0);
+            o.sumMeasured += kwh;
+            o.sumKwh += isMonthly ? kwh : Number(p.chartKwh !== undefined ? p.chartKwh : kwh);
+            if (!p.filler) o.real++;
+            if (p.partial) o.partial = true;
+            o.meters.add(m.id);
+            if (p.date < o.minD) o.minD = p.date;
+            if (p.date > o.maxD) o.maxD = p.date;
+          }));
+          return map;
+        };
+        const pMap = build(primList), sMap = mixed ? build(mains) : {};
+        const keys = Array.from(new Set([...Object.keys(pMap), ...Object.keys(sMap)])).sort();
+        if (keys.length === 0) {
           showChartEmptyState(
-            `ไม่พบข้อมูลรายวันในช่วง [${periodLabel}]`,
-            'ลองปรับช่วงเวลาในตัวกรองปฏิทินด้านบน หรือเลือก "7 วันล่าสุด" / "เดือนนี้"'
+            isMonthly ? `ไม่พบข้อมูลรายเดือนในช่วง [${periodLabel}]` : `ไม่พบข้อมูลรายวันในช่วง [${periodLabel}]`,
+            isMonthly ? 'ระบบจะแสดงกราฟรายเดือนเมื่อมีประวัติการบันทึกต่อเนื่อง' : 'ลองเลือก "7 วันล่าสุด" / "เดือนนี้" หรือปรับช่วงวันด้านบน'
           );
           if (footerNote) footerNote.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1"></span><span>ไม่มีข้อมูลในช่วงเวลาที่เลือก</span>';
           return;
         }
-
         hideChartEmptyState();
-
-        let totalVal = 0;
-        sortedDays.forEach(d => {
-          totalVal += isReading ? daysMap[d].sumReading : daysMap[d].sumMeasured;
-        });
-        const avgVal = totalVal / sortedDays.length;
-
-        if (footerNote) {
-          footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-indigo-500 mr-1"></span><span>ช่วง [${periodLabel}]: มีข้อมูล ${sortedDays.length} วัน | รวม: <b>${totalVal.toLocaleString('th-TH', {minimumFractionDigits: 1, maximumFractionDigits: 2})} ${isReading ? 'kWh (ผลรวมเลขมิเตอร์)' : 'kWh'}</b> (เฉลี่ย ${avgVal.toLocaleString('th-TH', {maximumFractionDigits: 1})} /วัน)</span>`;
-        }
-
-        chartType = sortedDays.length === 1 ? 'bar' : 'line';
-        datasetLabel = isReading 
-          ? `เลขมิเตอร์ (${activeMeters.length} จุด)` 
-          : `การใช้ไฟ (${groupTitle}) kWh`;
-
-        let lineColor = '#4f46e5';
-        let fillColor = 'rgba(99, 102, 241, 0.15)';
-        if (chartFilterPreset === 'subpanels') {
-          lineColor = '#059669';
-          fillColor = 'rgba(16, 185, 129, 0.15)';
-        } else if (chartFilterPreset === 'mains') {
-          lineColor = '#7e22ce';
-          fillColor = 'rgba(147, 51, 234, 0.15)';
-        }
-
-        sortedDays.forEach(dayStr => {
-          const parts = dayStr.split('-');
-          labels.push(`${parseInt(parts[2])}/${parseInt(parts[1])}`);
-          const dayData = daysMap[dayStr];
-          const val = isReading ? dayData.sumReading : dayData.sumKwh;
-          dataValues.push(val);
-
-          bgColors.push(sortedDays.length === 1 ? lineColor : fillColor);
-          borderColors.push(lineColor);
-
-          extraData.push({
-            dateStr: dayStr,
-            val: val,
-            isReading: isReading,
-            meterCount: dayData.count,
-            totalMeters: activeMeters.length,
-            groupTitle: groupTitle,
-            est: dayData.real === 0,
-            partial: !isReading && dayData.partial
-          });
-        });
-
-      } else if (mode === 'monthly') {
-        const activeMeters = METERS.filter(m => !chartExcludedIds.has(m.id));
-
-        if (activeMeters.length === 0) {
-          showChartEmptyState(
-            'ไม่มีจุดที่เลือกแสดง',
-            'คุณยกเว้นการแสดงผลทุกจุด กรุณาแตะ "เลือกจุดเอง" หรือ "แสดงครบ 15 จุด" ด้านบน'
-          );
-          return;
-        }
-
-        const isReading = (chartMetricType === 'reading');
-        let groupTitle = '';
-        if (chartFilterPreset === 'subpanels') groupTitle = '⚡ รวมจุดย่อย (ไม่นับซ้ำ Main)';
-        else if (chartFilterPreset === 'mains') groupTitle = '🏢 จุดหลัก (เฉพาะตู้ Main)';
-        else if (chartFilterPreset === 'all') groupTitle = '🌐 รวมครบ 15 จุด';
-        else groupTitle = `⚙️ รวมที่เลือก (${activeMeters.length} จุด)`;
-
-        if (titleEl) {
-          titleEl.innerText = isReading
-            ? `🗓️ ค่าเลขมิเตอร์รายเดือน - ${groupTitle}`
-            : `🗓️ กราฟเปรียบเทียบการใช้ไฟฟ้ารายเดือน - ${groupTitle}`;
-        }
-        if (subTitleEl) {
-          subTitleEl.innerText = isReading
-            ? `ตัวเลขหน้าปัดมิเตอร์สิ้นแต่ละเดือน (${activeMeters.length} จุด) ในช่วง [${periodLabel}]`
-            : `เปรียบเทียบปริมาณพลังงานสะสมรายเดือน (kWh และ MWh) รวม ${activeMeters.length} จุด`;
-        }
-
-        let monthsMap = {};
-        activeMeters.forEach(m => {
-          const pts = getAllPointsForMeter(m.id);
-          const lastReadingOfMonth = {};
-          pts.forEach(p => {
-            const mKey = p.date.substring(0, 7);
-            const inRange = (chartPeriodMode === 'customMonths') 
-              ? (mKey >= chartStartMonth && mKey <= chartEndMonth)
-              : true;
-            if (inRange) {
-              if (!monthsMap[mKey]) monthsMap[mKey] = { sumKwh: 0, sumReading: 0, count: 0 };
-              monthsMap[mKey].sumKwh += Number(p.kwhEq || 0);
-              lastReadingOfMonth[mKey] = Number(p.readingKwh || 0); // ใช้เลขมิเตอร์ ณ สิ้นเดือน (kWh)
-              monthsMap[mKey].count += 1;
-            }
-          });
-          Object.keys(lastReadingOfMonth).forEach(k => { monthsMap[k].sumReading += lastReadingOfMonth[k]; });
-        });
-
-        const sortedMonths = Object.keys(monthsMap).sort();
-
-        if (sortedMonths.length === 0) {
-          showChartEmptyState(
-            `ไม่พบข้อมูลรายเดือนในช่วง [${periodLabel}]`,
-            'ระบบจะแสดงกราฟรายเดือนเมื่อมีประวัติการบันทึกต่อเนื่อง'
-          );
-          if (footerNote) footerNote.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1"></span><span>ยังไม่มีข้อมูลรายเดือน</span>';
-          return;
-        }
-
-        hideChartEmptyState();
-        if (footerNote) {
-          footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1"></span><span>ช่วง [${periodLabel}]: ทั้งหมด ${sortedMonths.length} เดือน (${groupTitle})</span>`;
-        }
-
-        chartType = 'bar';
-        datasetLabel = isReading ? `เลขมิเตอร์ (${groupTitle})` : `การใช้ไฟรายเดือน (${groupTitle}) kWh`;
-
         const thMonthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-        let barColor = 'rgba(168, 85, 247, 0.82)';
-        let strokeColor = '#9333ea';
-        if (chartFilterPreset === 'subpanels') {
-          barColor = 'rgba(16, 185, 129, 0.82)';
-          strokeColor = '#059669';
-        }
-
-        sortedMonths.forEach(mKey => {
-          const parts = mKey.split('-');
-          const mIdx = parseInt(parts[1]) - 1;
-          const label = `${thMonthNames[mIdx] || parts[1]} ${parts[0].substring(2)}`;
-          labels.push(label);
-          const mData = monthsMap[mKey];
-          const val = isReading ? mData.sumReading : mData.sumKwh;
-          dataValues.push(val);
-          bgColors.push(isReading ? 'rgba(14, 165, 233, 0.82)' : barColor);
-          borderColors.push(isReading ? '#0284c7' : strokeColor);
-          extraData.push({
-            monthKey: mKey,
-            val: val,
-            isReading: isReading,
-            meterCount: mData.count,
-            totalMeters: activeMeters.length,
-            groupTitle: groupTitle
-          });
+        const dm = d => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
+        const info = (o, k, list, title) => {
+          if (!o) return { key: k, missing: true, groupTitle: title };
+          const x = { key: k, val: o.sumKwh, measured: o.sumMeasured, meterCount: o.meters.size, totalMeters: list.length, groupTitle: title,
+            est: !isMonthly && o.real === 0, partial: !isMonthly && o.partial };
+          if (isMonthly) {
+            // เดือนที่ข้อมูลไม่ครบ (เดือนปัจจุบัน หรือเดือนแรกที่เริ่มจด) → แท่งสีจาง + คาดการณ์ทั้งเดือน
+            const p = k.split('-').map(Number);
+            const dim = new Date(p[0], p[1], 0).getDate();
+            const cov = daysBetween(o.minD, o.maxD);
+            if (cov < dim) { x.monthPartial = true; x.coverFrom = dm(o.minD); x.coverTo = dm(o.maxD); x.coverDays = cov; x.daysInMonth = dim; x.projected = o.sumMeasured / cov * dim; }
+          }
+          return x;
+        };
+        chartType = isMonthly ? 'bar' : (keys.length === 1 ? 'bar' : 'line');
+        const pRGB = subs.length ? '16, 185, 129' : '147, 51, 234', pLine = subs.length ? '#059669' : '#7e22ce';
+        keys.forEach(k => {
+          const x = info(pMap[k], k, primList, primTitle);
+          labels.push(isMonthly ? `${thMonthNames[+k.slice(5, 7) - 1]} ${k.slice(2, 4)}${x.monthPartial ? '*' : ''}` : dm(k));
+          dataValues.push(x.missing ? null : x.val);
+          extraData.push(x);
+          bgColors.push(chartType === 'bar' ? `rgba(${pRGB}, ${x.monthPartial ? 0.3 : 0.82})` : `rgba(${pRGB}, 0.15)`);
+          borderColors.push(pLine);
         });
-
+        if (mixed) {
+          series2 = { label: `🏢 ตู้ Main (${mains.length} จุด) kWh`, data: [], extra: [], bg: [], border: '#7e22ce' };
+          keys.forEach(k => {
+            const x = info(sMap[k], k, mains, `🏢 ตู้ Main (${mains.length} จุด)`);
+            series2.data.push(x.missing ? null : x.val);
+            series2.extra.push(x);
+            series2.bg.push(chartType === 'bar' ? `rgba(147, 51, 234, ${x.monthPartial ? 0.3 : 0.82})` : 'rgba(147, 51, 234, 0.06)');
+          });
+        }
+        datasetLabel = `${primTitle} kWh`;
+        if (titleEl) titleEl.innerText = isMonthly ? `🗓️ การใช้ไฟรายเดือน (kWh) - ${groupTitle}` : `📈 แนวโน้มการใช้ไฟรายวัน (kWh) - ${groupTitle}`;
+        if (subTitleEl) subTitleEl.innerText = isMonthly
+          ? `ช่วง [${chartPeriodMode === 'customMonths' ? periodLabel : 'ทุกเดือนที่มีข้อมูล'}] · แท่งสีจาง + * = เดือนที่ข้อมูลยังไม่ครบ (ดูค่าคาดการณ์ทั้งเดือนใน tooltip)`
+          : `ช่วง [${periodLabel}] · เส้นประ/จุดกลวง = ประมาณการ (วันที่ไม่ได้จด หรือยังไม่ครบวัน)`;
+        if (footerNote) {
+          const sumOf = map => Object.values(map).reduce((a, o) => a + o.sumMeasured, 0);
+          const pSum = sumOf(pMap), pN = Object.keys(pMap).length || 1;
+          let txt = `ช่วงนี้: ${keys.length} ${isMonthly ? 'เดือน' : 'วัน'} | ${primTitle} รวม <b>${fmtKwh(pSum)} kWh</b> (เฉลี่ย ${fmtKwh(pSum / pN)} /${isMonthly ? 'เดือน' : 'วัน'})`;
+          if (mixed) txt += ` · 🏢 ตู้ Main รวม <b>${fmtKwh(sumOf(sMap))} kWh</b>`;
+          footerNote.innerHTML = `<span class="inline-block w-2 h-2 rounded-full ${isMonthly ? 'bg-purple-500' : 'bg-indigo-500'} mr-1"></span><span>${txt}</span>`;
+        }
       } else if (mode === 'single') {
         const m = METERS.find(x => x.id === selectedMeter) || METERS[0];
-        const isReading = (chartMetricType === 'reading');
+        const isReading = (metricType === 'reading');
         const isMain = !!m.isMain;
 
         if (titleEl) {
@@ -4172,15 +3521,32 @@ function toggleDashTotalMode() {
             pointBorderWidth: 2,
             segment: { borderDash: ctx => (estFlags[ctx.p1DataIndex] ? [5, 4] : undefined) },
             pointRadius: chartType === 'line' ? 4 : 0,
-            pointHoverRadius: 6
-          }]
+            pointHoverRadius: 6,
+            spanGaps: true
+          }].concat(series2 ? [{
+            label: series2.label,
+            data: series2.data,
+            backgroundColor: series2.bg,
+            borderColor: series2.border,
+            borderWidth: 2,
+            borderRadius: chartType === 'bar' ? 6 : 0,
+            fill: false,
+            tension: 0.3,
+            pointBackgroundColor: series2.extra.map(d => (d && (d.est || d.partial)) ? '#ffffff' : series2.border),
+            pointBorderColor: series2.border,
+            pointBorderWidth: 2,
+            segment: { borderDash: ctx => { const d = series2.extra[ctx.p1DataIndex]; return (d && (d.est || d.partial)) ? [5, 4] : undefined; } },
+            pointRadius: chartType === 'line' ? 4 : 0,
+            pointHoverRadius: 6,
+            spanGaps: true
+          }] : [])
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 400 },
           plugins: {
-            legend: { display: false },
+            legend: { display: !!series2, labels: { font: { family: "'Sarabun', sans-serif", size: 11 }, boxWidth: 12 } },
             tooltip: {
               backgroundColor: '#0f172a',
               titleFont: { family: "'Sarabun', sans-serif", size: 13, weight: 'bold' },
@@ -4193,7 +3559,7 @@ function toggleDashTotalMode() {
                   if (mode === 'meters') {
                     return `[${labels[idx]}] ${extraData[idx]?.name || ''}`;
                   } else if (mode === 'daily') {
-                    return `วันที่: ${extraData[idx]?.dateStr || labels[idx]}`;
+                    return `วันที่: ${extraData[idx]?.key || labels[idx]}`;
                   } else if (mode === 'monthly') {
                     return `เดือน: ${labels[idx]}`;
                   } else if (mode === 'single') {
@@ -4203,54 +3569,31 @@ function toggleDashTotalMode() {
                 },
                 label: function(item) {
                   const idx = item.dataIndex;
-                  const d = extraData[idx];
+                  const d = (series2 && item.datasetIndex === 1) ? series2.extra[idx] : extraData[idx];
                   if (mode === 'meters') {
                     if (!d.hasData) return 'สถานะ: ⚠️ ยังไม่มีการบันทึกในช่วงนี้';
                     const unitStr = d.unit || 'kWh';
-                    const lines = [];
-                    lines.push(`🔢 เลขที่จดปัจจุบัน: ${Number(d.currentReading || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
-                    if (chartMetricType === 'reading' && unitStr.toUpperCase() === 'MWH') lines.push(`(= ${toKwh(d.currentReading, unitStr).toLocaleString(undefined, {maximumFractionDigits: 1})} kWh — ความสูงแท่งกราฟ)`);
-                    lines.push(`⚡ หน่วยที่ใช้ (+): +${Number(d.diff || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
-                    if (unitStr.toUpperCase() === 'MWH') {
-                      lines.push(`(= ${Number(d.kwhEq || 0).toLocaleString(undefined, {maximumFractionDigits: 1})} kWh)`);
-                    }
-                    if (chartExcludedIds.size > 0 && d.groupShare) {
-                      lines.push(`สัดส่วนในกลุ่มที่เลือก: ${d.groupShare}%`);
-                    }
-                    lines.push(`สัดส่วนรวมทั้งโรงงาน: ${d.factoryShare || d.share || 0}%`);
-                    if (d.isMain) {
-                      lines.push(`🏢 [ตู้เมนหลักอาคาร]`);
+                    const lines = [`⚡ ใช้ไฟ: ${fmtKwh(d.kwhEq)} kWh${d.today ? ' (ปรับเป็นต่อ 24 ชม.)' : ''}`];
+                    if (d.today) lines.push(`หน่วยที่จดรอบนี้: +${Number(d.diff || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
+                    else lines.push(`จดจริง ${d.realDays} วันในช่วงนี้`);
+                    lines.push(`🔢 เลขมิเตอร์ล่าสุด: ${Number(d.currentReading || 0).toLocaleString(undefined, {maximumFractionDigits: 4})} ${unitStr}`);
+                    lines.push(d.isMain ? `🏢 สัดส่วนของตู้ Main รวม: ${d.factoryShare}%` : `สัดส่วนของตู้ย่อยทั้งหมด: ${d.factoryShare}%`);
+                    if (chartFilterPreset === 'custom' && d.groupShare !== d.factoryShare) lines.push(`สัดส่วนในกลุ่มที่เลือก: ${d.groupShare}%`);
+                    return lines;
+                  } else if (mode === 'daily' || mode === 'monthly') {
+                    if (!d || d.missing) return `${d ? d.groupTitle : ''}: ไม่มีข้อมูล`;
+                    const kwhVal = Number(item.raw || 0);
+                    const lines = [
+                      `${d.groupTitle}: ${fmtKwh(kwhVal)} kWh (= ${(kwhVal / 1000).toLocaleString(undefined, {maximumFractionDigits: 3})} MWh)`,
+                      `   รายงาน ${d.meterCount}/${d.totalMeters} จุด`
+                    ];
+                    if (d.partial) lines.push('   ⏳ ยังไม่ครบวัน — ส่วนที่เหลือคาดการณ์จากอัตราล่าสุด');
+                    else if (d.est) lines.push('   ⚠️ ประมาณการ — วันนี้ไม่มีการจด (แบ่งตามชั่วโมงจากรอบที่ครอบอยู่)');
+                    if (d.monthPartial) {
+                      lines.push(`   ⏳ ข้อมูลไม่ครบเดือน (${d.coverFrom}–${d.coverTo}, ${d.coverDays}/${d.daysInMonth} วัน)`);
+                      lines.push(`   ≈ คาดการณ์ทั้งเดือน ${fmtKwh(d.projected, 0)} kWh`);
                     }
                     return lines;
-                  } else if (mode === 'daily') {
-                    if (d.isReading) {
-                      return [
-                        `เลขมิเตอร์รวม: ${Number(item.raw || 0).toLocaleString(undefined, {maximumFractionDigits: 2})} kWh (แปลง MWh→kWh แล้ว)`,
-                        `กลุ่ม: ${d.groupTitle || ''} (${d.meterCount || 0} จุด)`
-                      ];
-                    }
-                    const kwhVal = Number(item.raw || 0);
-                    const mwhVal = kwhVal / 1000;
-                    return [
-                      `⚡ ปริมาณไฟฟ้ารวม: ${kwhVal.toLocaleString(undefined, {maximumFractionDigits: 1})} kWh`,
-                      `(= ${mwhVal.toLocaleString(undefined, {maximumFractionDigits: 4})} MWh)`,
-                      `กลุ่ม: ${d.groupTitle || ''} (รายงาน ${d.meterCount || 0}/${d.totalMeters || 0} จุด)`,
-                      ...(d.partial ? ['⏳ ยังไม่ครบวัน — ส่วนที่เหลือคาดการณ์จากอัตราล่าสุด'] : (d.est ? ['⚠️ ประมาณการ — วันนี้ไม่มีการจด (แบ่งตามชั่วโมงจากรอบที่ครอบอยู่)'] : []))
-                    ];
-                  } else if (mode === 'monthly') {
-                    if (d.isReading) {
-                      return [
-                        `เลขมิเตอร์สิ้นเดือน (รวม): ${Number(item.raw || 0).toLocaleString(undefined, {maximumFractionDigits: 2})} kWh`,
-                        `กลุ่ม: ${d.groupTitle || ''}`
-                      ];
-                    }
-                    const kwhVal = Number(item.raw || 0);
-                    const mwhVal = kwhVal / 1000;
-                    return [
-                      `⚡ พลังงานไฟฟ้ารวม: ${kwhVal.toLocaleString(undefined, {maximumFractionDigits: 1})} kWh`,
-                      `(= ${mwhVal.toLocaleString(undefined, {maximumFractionDigits: 4})} MWh)`,
-                      `กลุ่ม: ${d.groupTitle || ''}`
-                    ];
                   } else if (mode === 'single') {
                     const unitStr = d?.unit || 'kWh';
                     const lines = [
@@ -4281,14 +3624,14 @@ function toggleDashTotalMode() {
               }
             },
             y: {
-              beginAtZero: chartMetricType !== 'reading', // กราฟ kWh เริ่มที่ 0 — ไม่ซูมจนความต่างเล็กๆ ดูเหมือนสวิงแรง
+              beginAtZero: metricType !== 'reading', // กราฟ kWh เริ่มที่ 0 — ไม่ซูมจนความต่างเล็กๆ ดูเหมือนสวิงแรง
               grace: '8%',
               grid: { color: 'rgba(226, 232, 240, 0.7)' },
               ticks: {
                 font: { family: "'Sarabun', sans-serif", size: 10 },
                 color: '#64748b',
                 callback: function(val) {
-                  if (chartMetricType === 'reading') {
+                  if (metricType === 'reading') {
                     if (val >= 100000) return (val / 1000).toFixed(0) + 'k';
                     return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 });
                   }
