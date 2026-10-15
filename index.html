@@ -114,7 +114,7 @@
       #viewDashboard { padding-bottom: 8px; }
       .kpi-head { flex-wrap: wrap; gap: 4px; }
       input, select, textarea { font-size: 16px !important; } /* กัน iPhone ซูมเองตอนแตะช่องกรอก */
-      #fltAll, #fltPending, #fltDone, #btnLayoutEdit { padding: 5px 10px; font-size: 12px; flex-shrink: 0; border-radius: 9999px; }
+      #fltAll, #fltPending, #fltDone, #btnLayoutEdit, #btnRoute { padding: 5px 10px; font-size: 12px; flex-shrink: 0; border-radius: 9999px; }
     }
     .mnav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 7px 0 6px; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
     .mnav-btn .ico { font-size: 20px; line-height: 1; filter: grayscale(1); opacity: .75; transition: transform .15s; }
@@ -218,6 +218,7 @@
           <button onclick="filterStatus('all')" id="fltAll" class="px-2 py-0.5 text-[11px] rounded font-semibold bg-slate-900 text-white">ทั้งหมด (15)</button>
           <button onclick="filterStatus('pending')" id="fltPending" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">รอจด (<span id="pendingBadgeCount">15</span>)</button>
           <button onclick="filterStatus('done')" id="fltDone" class="px-2 py-0.5 text-[11px] rounded font-medium bg-slate-200 text-slate-700">จดแล้ว (<span id="doneBadgeCount">0</span>)</button>
+          <button onclick="toggleRoute()" id="btnRoute" title="แนะนำลำดับการเดินจด" class="shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border border-indigo-300 text-indigo-700 bg-white">🧭 นำทาง</button>
           <button onclick="toggleLayoutEdit()" id="btnLayoutEdit" title="ลากจุดและกล่องชื่อบนแผนผัง" class="px-2 py-0.5 text-[11px] rounded font-medium border border-sky-300 text-sky-700">✏️ จัดตำแหน่ง</button>
           <button onclick="resetDemoData()" title="รีเซ็ตข้อมูลจำลอง" class="hidden sm:inline-block text-rose-600 hover:text-rose-700 px-1.5 py-0.5 text-[11px] font-medium border border-rose-200 rounded">รีเซ็ต</button>
         </div>
@@ -233,6 +234,7 @@
 
           <!-- Leader lines (drawn by JS) -->
           <svg id="leaderLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807"></svg>
+          <svg id="routeLayer" class="absolute inset-0 pointer-events-none" width="995" height="807" viewBox="0 0 995 807" style="z-index:5"></svg>
 
           <!-- Hotspots Layer -->
           <div id="hotspotLayer" class="absolute inset-0 pointer-events-auto"></div>
@@ -266,6 +268,9 @@
           </div>
           <div id="layoutEditMsg" class="text-[11px] text-rose-600 font-semibold"></div>
         </div>
+
+        <!-- ROUTE PANEL (แนะนำเส้นทางเดินจด) -->
+        <div id="routePanel" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onwheel="event.stopPropagation()" class="hidden absolute bottom-3 left-2 right-2 sm:left-3 sm:right-auto sm:w-80 z-30 bg-white/95 backdrop-blur border-2 border-indigo-500 rounded-2xl shadow-2xl p-2.5 text-xs space-y-2"></div>
 
         <!-- Touch / Pinch Helper Badge for Mobile -->
         <div id="touchHelpHint" class="absolute bottom-3 left-3 z-20 pointer-events-none bg-slate-900/80 backdrop-blur-sm text-slate-300 text-[11px] px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg opacity-90 transition-opacity duration-500">
@@ -683,6 +688,9 @@
     </div>
 
   </main>
+
+  <!-- การ์ด "ตู้ถัดไป" หลังบันทึก -->
+  <div id="nextCard" class="hidden fixed left-2 right-2 sm:left-auto sm:right-4 sm:w-80 z-[45] top-[calc(var(--hdrH,76px)+8px)] sm:top-auto sm:bottom-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-indigo-400 p-3 text-xs"></div>
 
   <!-- มือถือ: เมนูด้านล่างแบบแอป -->
   <nav id="mobileNav" class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex">
@@ -1474,9 +1482,131 @@
 
       if (layoutEditMode) attachLayoutDrag();
       drawLeaderLines();
+      try { drawRoute(); } catch (e) { console.warn(e); }
       renderQuickSelector();
       updateStats();
     }
+
+    // ----------------------------------------------------
+    // ROUTE GUIDE: แนะนำลำดับเดินจด (ตามระยะบนแผนผัง — เส้นตรง ไม่ได้คิดกำแพง/ทางเดิน)
+    // ----------------------------------------------------
+    let routeOn = false, routeStartId = '';
+    try { routeOn = localStorage.getItem('pm_route_on') === '1'; routeStartId = localStorage.getItem('pm_route_start') || ''; } catch (e) {}
+    const ptOf = m => ({ x: m.planX / 100 * BASE_WIDTH, y: m.planY / 100 * BASE_HEIGHT });
+    const distM = (a, b) => { const p = ptOf(a), q = ptOf(b); return Math.hypot(p.x - q.x, p.y - q.y); };
+    const tagOf = m => (m.label ? m.label + ' ' : '') + m.name;
+    // ตู้ที่ยังไม่จด เรียงตามระยะเดินสั้นที่สุด (ใกล้สุดก่อน + ปรับสลับลำดับ 2-opt) เริ่มจาก startId
+    function planRoute(startId) {
+      const pending = METERS.filter(m => !recordsData[m.id]);
+      const start = METERS.find(m => m.id === startId);
+      if (!pending.length) return { start, order: [] };
+      const pool = pending.filter(m => !start || m.id !== start.id);
+      const path = start ? [start] : [pool.shift()];
+      while (pool.length) {
+        const cur = path[path.length - 1];
+        let bi = 0, bd = Infinity;
+        pool.forEach((m, i) => { const d = distM(cur, m); if (d < bd) { bd = d; bi = i; } });
+        path.push(pool.splice(bi, 1)[0]);
+      }
+      // 2-opt: สลับช่วงลำดับถ้าทำให้ระยะรวมสั้นลง (จุดเริ่มคงที่ เส้นทางไม่ต้องวนกลับ)
+      let improved = true, guard = 0;
+      while (improved && guard++ < 60) {
+        improved = false;
+        for (let i = 1; i < path.length - 1; i++) for (let k = i + 1; k < path.length; k++) {
+          const a = path[i - 1], b = path[i], c = path[k], d = path[k + 1];
+          const before = distM(a, b) + (d ? distM(c, d) : 0), after = distM(a, c) + (d ? distM(b, d) : 0);
+          if (after + 0.01 < before) { path.splice(i, k - i + 1, ...path.slice(i, k + 1).reverse()); improved = true; }
+        }
+      }
+      return { start, order: path.filter(m => !recordsData[m.id]) };
+    }
+    function defaultRouteStart() {
+      if (routeStartId && METERS.some(m => m.id === routeStartId)) return routeStartId;
+      const done = Object.values(recordsData).filter(r => r && r.timestamp).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+      if (done.length && METERS.some(m => m.id === done[0].meterId)) return done[0].meterId;
+      const p = METERS.filter(m => !recordsData[m.id]);
+      return (p[0] || METERS[0] || {}).id || '';
+    }
+    function toggleRoute(force) {
+      routeOn = typeof force === 'boolean' ? force : !routeOn;
+      try { localStorage.setItem('pm_route_on', routeOn ? '1' : '0'); } catch (e) {}
+      if (routeOn && typeof switchView === 'function' && document.getElementById('viewMap').classList.contains('hidden')) switchView('map');
+      drawRoute(); renderCards();
+    }
+    function setRouteStart(id) {
+      routeStartId = id; try { localStorage.setItem('pm_route_start', id); } catch (e) {}
+      drawRoute(); renderCards();
+    }
+    function drawRoute() {
+      const svg = document.getElementById('routeLayer'), panel = document.getElementById('routePanel'), btn = document.getElementById('btnRoute');
+      if (!svg || !panel) return;
+      if (btn) btn.className = 'shrink-0 px-2 py-0.5 text-[11px] rounded font-bold border ' + (routeOn ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-300 text-indigo-700 bg-white');
+      if (!routeOn) { svg.innerHTML = ''; panel.classList.add('hidden'); const h = document.getElementById('touchHelpHint'); if (h) h.classList.remove('hidden'); return; }
+      const h = document.getElementById('touchHelpHint'); if (h) h.classList.add('hidden');
+      const sid = defaultRouteStart();
+      const { start, order } = planRoute(sid);
+      const pts = (start && recordsData[start.id] ? [start] : []).concat(order).map(ptOf);
+      let out = '';
+      if (pts.length > 1) {
+        out += `<polyline points="${pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}" fill="none" stroke="#4f46e5" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`;
+        for (let i = 1; i < pts.length; i++) { // ลูกศรกลางเส้น
+          const a = pts[i - 1], b = pts[i], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+          out += `<path d="M-6,-5 L6,0 L-6,5 Z" fill="#4f46e5" transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`;
+        }
+      }
+      order.forEach((m, i) => { const p = ptOf(m);
+        out += `<g transform="translate(${(p.x + 13).toFixed(1)},${(p.y - 13).toFixed(1)})"><circle r="9" fill="${i === 0 ? '#4f46e5' : '#ffffff'}" stroke="#4f46e5" stroke-width="2"/><text text-anchor="middle" dy="3.5" font-size="10" font-weight="800" fill="${i === 0 ? '#fff' : '#4f46e5'}">${i + 1}</text></g>`;
+        if (i === 0) out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="20" fill="none" stroke="#4f46e5" stroke-width="3"><animate attributeName="r" values="14;26;14" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>`;
+      });
+      svg.innerHTML = out;
+      const opts = METERS.slice().sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true }))
+        .map(m => `<option value="${m.id}" ${m.id === sid ? 'selected' : ''}>${escHtml(tagOf(m))}${recordsData[m.id] ? ' ✓' : ''}</option>`).join('');
+      const next = order[0];
+      panel.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-indigo-800">🧭 แนะนำเส้นทางเดินจด</span>
+          <button type="button" onclick="toggleRoute(false)" class="text-slate-400 hover:text-slate-700 px-1 text-base leading-none">✕</button>
+        </div>
+        <label class="flex items-center gap-1.5"><span class="text-slate-500 shrink-0">เริ่มจาก</span>
+          <select onchange="setRouteStart(this.value)" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-1.5 py-1 bg-white text-xs">${opts}</select></label>
+        ${next ? `
+        <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-2 py-1.5">
+          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0">1</span>
+          <div class="min-w-0 flex-1"><div class="text-[10px] text-indigo-600 font-semibold">ไปจดตู้นี้ก่อน</div><div class="font-bold text-slate-900 truncate">${escHtml(tagOf(next))}</div></div>
+          <button type="button" onclick="focusMeter('${next.id}')" class="px-2 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-700 font-bold shrink-0">📍</button>
+          <button type="button" onclick="openRecordModal('${next.id}')" class="px-2 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold shrink-0">📝 จด</button>
+        </div>
+        <div class="text-[11px] text-slate-600 leading-snug">ลำดับต่อไป: ${order.slice(1, 6).map((m, i) => `<b>${i + 2}.</b> ${escHtml(m.label || m.name)}`).join(' → ') || '-'}${order.length > 6 ? ' → …' : ''}</div>
+        <div class="text-[10px] text-slate-400">เหลือ ${order.length} ตู้ • คิดจากระยะเส้นตรงบนแผนผัง (ไม่ได้คิดกำแพง/ทางเดิน)</div>`
+        : '<div class="text-emerald-700 font-bold py-1">✓ จดครบทุกตู้แล้ววันนี้</div>'}`;
+      panel.classList.remove('hidden');
+    }
+    // หลังบันทึก: แนะนำตู้ถัดไปที่ใกล้ที่สุด
+    function showNextSuggestion(fromId) {
+      const card = document.getElementById('nextCard'); if (!card) return;
+      if (routeOn) { routeStartId = fromId; try { localStorage.setItem('pm_route_start', fromId); } catch (e) {} drawRoute(); }
+      const { order } = planRoute(fromId);
+      const from = METERS.find(m => m.id === fromId);
+      if (!order.length) {
+        card.innerHTML = '<div class="flex items-center justify-between gap-2"><span class="font-bold text-emerald-300">🎉 จดครบทุกตู้แล้ววันนี้</span><button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base">✕</button></div>';
+      } else {
+        const n = order[0];
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <span class="text-indigo-300 font-semibold">🧭 ตู้ถัดไปที่ใกล้ที่สุด${from ? ' (จาก ' + escHtml(from.label || from.name) + ')' : ''}</span>
+            <button type="button" onclick="hideNextCard()" class="text-slate-400 px-1 text-base leading-none">✕</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="min-w-0 flex-1"><div class="font-black text-base truncate">${escHtml(tagOf(n))}</div>
+              <div class="text-[10px] text-slate-400">เหลืออีก ${order.length} ตู้${order[1] ? ' • ต่อจากนั้น: ' + escHtml(order[1].label || order[1].name) : ''}</div></div>
+            <button type="button" onclick="hideNextCard(); switchView('map'); setTimeout(() => focusMeter('${n.id}'), 120)" class="px-2.5 py-2 rounded-xl bg-slate-700 font-bold shrink-0">📍</button>
+            <button type="button" onclick="hideNextCard(); openRecordModal('${n.id}')" class="px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold shrink-0">📝 จดต่อ</button>
+          </div>`;
+      }
+      card.classList.remove('hidden');
+      clearTimeout(window.__nextCardT); window.__nextCardT = setTimeout(hideNextCard, 20000);
+    }
+    function hideNextCard() { const c = document.getElementById('nextCard'); if (c) c.classList.add('hidden'); }
 
     // Leader lines: from the edge of each callout box to its pin (SVG, redrawn on every move)
     function drawLeaderLines() {
@@ -1865,15 +1995,22 @@
     function renderListChips() {
       const el = document.getElementById('listChips'); if (!el) return;
       const done = METERS.filter(m => !!recordsData[m.id]).length, all = METERS.length;
+      const routeChip = `<button type="button" onclick="toggleRoute()" class="mchip" style="${routeOn ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : 'color:#4338ca;border-color:#a5b4fc'}">🧭 เรียงตามเส้นทาง</button>`;
       const chip = (k, txt) => `<button type="button" onclick="filterStatus('${k}')" class="mchip ${currentFilter === k ? 'on-' + k : ''}">${txt}</button>`;
-      el.innerHTML = chip('all', 'ทั้งหมด ' + all) + chip('pending', '⚠️ รอจด ' + (all - done)) + chip('done', '✓ จดแล้ว ' + done);
+      el.innerHTML = chip('all', 'ทั้งหมด ' + all) + chip('pending', '⚠️ รอจด ' + (all - done)) + chip('done', '✓ จดแล้ว ' + done) + routeChip;
     }
     function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
       renderListChips();
       if (isPhone()) {
-        METERS.forEach(meter => {
+        let listOrder = METERS, stepOf = {};
+        if (routeOn) {
+          const r = planRoute(defaultRouteStart());
+          r.order.forEach((m, i) => stepOf[m.id] = i + 1);
+          listOrder = r.order.concat(METERS.filter(m => !stepOf[m.id]));
+        }
+        listOrder.forEach(meter => {
           const rec = recordsData[meter.id], ok = !!rec;
           if (currentFilter === 'pending' && ok) return;
           if (currentFilter === 'done' && !ok) return;
@@ -1892,7 +2029,7 @@
               <span class="text-sm">${(meter.label || '').match(/[0-9]+/) ? meter.label.match(/[0-9]+/)[0] : ok ? '✓' : '!'}</span>
             </div>
             <div class="min-w-0 flex-1">
-              <div class="font-bold text-slate-900 text-[15px] truncate">${meter.name}</div>
+              <div class="font-bold text-slate-900 text-[15px] truncate">${stepOf[meter.id] ? `<span class="inline-flex w-5 h-5 mr-1 rounded-full ${stepOf[meter.id] === 1 ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-300'} text-[11px] font-black items-center justify-center align-middle">${stepOf[meter.id]}</span>` : ''}${meter.name}</div>
               <div class="text-[12px] text-slate-500 truncate">${sub}</div>
             </div>
             <span class="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold ${ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-500 text-slate-950'}">${ok ? '✓ แก้ไข' : '📝 จด'}</span>`;
@@ -3005,8 +3142,10 @@ function toggleDashTotalMode() {
               renderHotspots();
               renderCards();
               renderDashboard();
+              const savedId = activeMeter.id;
               closeRecordModal();
               showToast(`✓ บันทึกค่า ${activeMeter.name} ลง Google Sheet สำเร็จ`);
+              try { showNextSuggestion(savedId); } catch (e) { console.warn(e); }
             } else {
               alert('ข้อผิดพลาดจาก Google Sheets: ' + (res ? res.message : 'ไม่ทราบสาเหตุ'));
             }
