@@ -66,6 +66,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       if (!getKey()) { askKey(''); return; }
       call('getFloorPlan', []).then(src => { const im = document.getElementById('floorPlanImg'); if (im && src) im.src = src; }).catch(() => {});
+      call('getTodayPhotos', []).then(m => { window.pmTodayPhotos = Object.assign(window.pmTodayPhotos || {}, m || {}); }).catch(() => {});
     });
     const setHdr = () => { const h = document.getElementById('appHeader'); if (h) document.documentElement.style.setProperty('--hdrH', h.offsetHeight + 'px'); };
     window.addEventListener('DOMContentLoaded', setHdr); window.addEventListener('resize', setHdr); window.addEventListener('load', setHdr);
@@ -893,6 +894,28 @@
               placeholder="เช่น ปิดเครื่องซ่อมบำรุง" 
               class="w-full text-xs bg-slate-50 border border-slate-300 focus:border-amber-500 focus:bg-white rounded-xl px-3 py-2.5 outline-none transition"
             >
+          </div>
+        </div>
+
+        <!-- Meter Photo (แนบรูปมิเตอร์ → Google Drive) -->
+        <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-semibold text-slate-700">📷 รูปหน้าจอมิเตอร์ <span class="font-normal text-slate-500">(ถ้ามี)</span></span>
+            <a id="formPhotoExisting" href="#" target="_blank" rel="noopener" class="hidden text-[11px] font-bold text-indigo-600 hover:underline">ดูรูปที่แนบไว้แล้ว ↗</a>
+          </div>
+          <input type="file" id="formPhotoInput" accept="image/*" capture="environment" class="hidden" onchange="handleMeterPhoto(this)">
+          <div id="formPhotoEmpty" class="mt-2">
+            <button type="button" onclick="document.getElementById('formPhotoInput').click()" class="w-full py-2.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 active:scale-[0.98] transition">📸 ถ่ายรูป / เลือกรูป</button>
+          </div>
+          <div id="formPhotoPreview" class="hidden mt-2 flex items-center gap-3">
+            <img id="formPhotoImg" alt="รูปมิเตอร์" class="w-20 h-20 object-cover rounded-lg border border-slate-300 bg-white">
+            <div class="flex-1 min-w-0 text-[11px] text-slate-600">
+              <div id="formPhotoInfo" class="font-semibold">-</div>
+              <div class="mt-1.5 flex gap-2">
+                <button type="button" onclick="document.getElementById('formPhotoInput').click()" class="px-2.5 py-1 rounded-md bg-white border border-slate-300 font-bold text-slate-700">ถ่ายใหม่</button>
+                <button type="button" onclick="clearMeterPhoto()" class="px-2.5 py-1 rounded-md bg-white border border-rose-300 font-bold text-rose-600">ลบรูป</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2943,6 +2966,7 @@ function toggleDashTotalMode() {
       }
 
       calculateDiff();
+      resetMeterPhoto(meterId);
 
       document.getElementById('recordModal').classList.remove('hidden');
       setTimeout(() => currentInput.focus(), 120);
@@ -3069,6 +3093,8 @@ function toggleDashTotalMode() {
         return;
       }
 
+      if (pmPhotoBusy) { alert('กำลังย่อรูป รอสักครู่แล้วกดบันทึกอีกครั้ง'); return; }
+
       const curUnit = document.getElementById('formUnit').value;
       const prevUnit = activeMeterPrevUnit || curUnit;
       const inspector = document.getElementById('formInspector').value.trim();
@@ -3117,6 +3143,11 @@ function toggleDashTotalMode() {
           inspector: inspector,
           remark: remark
         };
+        const hasPhoto = !!pmPhoto;
+        if (hasPhoto) {
+          payload.photo = { data: pmPhoto.data, mime: pmPhoto.mime, inspector: inspector };
+          btnSubmit.innerHTML = '<span>⏳ กำลังบันทึกค่า + อัปโหลดรูป...</span>';
+        }
 
         let isHandled = false;
         // ป้องกันการค้าง: ถ้าเกิน 15 วินาที ให้คืนปุ่มและแจ้งเตือนแนะนำวิธีแก้
@@ -3128,7 +3159,7 @@ function toggleDashTotalMode() {
             alert('⚠️ การบันทึกลง Google Sheets ใช้เวลานานเกินไป (ค้าง)\n\nสาเหตุที่พบบ่อยที่สุด:\n1. ยังไม่ได้กดปุ่ม "เรียกใช้ (Run)" ใน Apps Script เพื่อกดยอมรับ "อนุญาตสิทธิ์การเข้าถึง (Authorization)"\n2. หรือมีการแก้โค้ดใหม่ แต่ยังไม่ได้ไปที่ Deploy ➔ Manage deployments ➔ แก้ไขเป็น "เวอร์ชันใหม่"\n\nระบบจะบันทึกข้อมูลไว้ในเครื่องให้ชั่วคราวก่อนครับ');
             saveLocalFallback(activeMeter, currentVal, rawPrevVal, prevUnit, diff, curUnit, inspector, remark, dateStr, timeStr);
           }
-        }, 15000);
+        }, hasPhoto ? 45000 : 15000);
 
         google.script.run
           .withSuccessHandler(function(res) {
@@ -3138,13 +3169,15 @@ function toggleDashTotalMode() {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = originalBtnHtml;
             if (res && res.success) {
+              if (res.data && res.data.photoUrl) window.pmTodayPhotos[activeMeter.id] = res.data.photoUrl;
               recordsData[activeMeter.id] = res.data;
               renderHotspots();
               renderCards();
               renderDashboard();
               const savedId = activeMeter.id;
               closeRecordModal();
-              showToast(`✓ บันทึกค่า ${activeMeter.name} ลง Google Sheet สำเร็จ`);
+              showToast(`✓ บันทึกค่า ${activeMeter.name} ลง Google Sheet สำเร็จ` + (res.data && res.data.photoUrl ? ' + รูป 📷' : ''));
+              if (res.photoError) alert('บันทึกค่ามิเตอร์แล้ว แต่อัปโหลดรูปไม่สำเร็จ:\n' + res.photoError + '\n\nลองเปิดจุดนี้แล้วแนบรูปใหม่อีกครั้ง');
               try { showNextSuggestion(savedId); } catch (e) { console.warn(e); }
             } else {
               alert('ข้อผิดพลาดจาก Google Sheets: ' + (res ? res.message : 'ไม่ทราบสาเหตุ'));
@@ -4266,6 +4299,81 @@ function toggleDashTotalMode() {
             }
           }
         }
+      });
+    }
+
+    /* ===================== แนบรูปมิเตอร์ ===================== */
+    // ย่อรูปบนเครื่องก่อนส่ง: ด้านยาวสุด 1280 px, JPEG 70% (≈150–300 KB)
+    const PHOTO_MAX_SIDE = 1280, PHOTO_QUALITY = 0.7;
+    let pmPhoto = null, pmPhotoBusy = false;
+    window.pmTodayPhotos = window.pmTodayPhotos || {};
+
+    function resetMeterPhoto(meterId) {
+      pmPhoto = null; pmPhotoBusy = false;
+      const inp = document.getElementById('formPhotoInput'); if (inp) inp.value = '';
+      document.getElementById('formPhotoPreview').classList.add('hidden');
+      document.getElementById('formPhotoEmpty').classList.remove('hidden');
+      const ex = document.getElementById('formPhotoExisting');
+      const url = (window.pmTodayPhotos || {})[meterId];
+      if (url) { ex.href = url; ex.classList.remove('hidden'); } else { ex.classList.add('hidden'); }
+    }
+
+    function clearMeterPhoto() {
+      pmPhoto = null;
+      document.getElementById('formPhotoInput').value = '';
+      document.getElementById('formPhotoPreview').classList.add('hidden');
+      document.getElementById('formPhotoEmpty').classList.remove('hidden');
+    }
+
+    async function handleMeterPhoto(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { alert('กรุณาเลือกไฟล์รูปภาพ'); input.value = ''; return; }
+      pmPhotoBusy = true;
+      const info = document.getElementById('formPhotoInfo');
+      document.getElementById('formPhotoEmpty').classList.add('hidden');
+      document.getElementById('formPhotoPreview').classList.remove('hidden');
+      info.innerText = '⏳ กำลังย่อรูป...';
+      try {
+        const dataUrl = await compressMeterPhoto(file);
+        const b64 = dataUrl.split(',')[1];
+        pmPhoto = { data: b64, mime: 'image/jpeg' };
+        document.getElementById('formPhotoImg').src = dataUrl;
+        const kb = Math.round(b64.length * 3 / 4 / 1024);
+        info.innerText = `✓ พร้อมส่ง ${kb.toLocaleString()} KB (จากเดิม ${(file.size / 1048576).toFixed(1)} MB)`;
+      } catch (e) {
+        pmPhoto = null;
+        alert('อ่านรูปไม่ได้: ' + ((e && e.message) || e));
+        clearMeterPhoto();
+      } finally {
+        pmPhotoBusy = false;
+      }
+    }
+
+    function compressMeterPhoto(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+            const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+            const c = document.createElement('canvas'); c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            // ประทับเวลา + รหัสจุด มุมล่างซ้าย (หลักฐานเวลาที่ถ่าย)
+            const stamp = (activeMeter ? activeMeter.id + '  ' : '') + new Date().toLocaleString('th-TH', { hour12: false });
+            const fs = Math.max(14, Math.round(w / 40));
+            ctx.font = `bold ${fs}px sans-serif`;
+            const tw = ctx.measureText(stamp).width;
+            ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, h - fs * 1.8, tw + fs * 1.2, fs * 1.8);
+            ctx.fillStyle = '#fde047'; ctx.fillText(stamp, fs * 0.6, h - fs * 0.55);
+            resolve(c.toDataURL('image/jpeg', PHOTO_QUALITY));
+          } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('ไฟล์รูปเสียหรือไม่รองรับ (ถ้าเป็น HEIC ให้ตั้งกล้องเป็น JPG)')); };
+        img.src = url;
       });
     }
 
